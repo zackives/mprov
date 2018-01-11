@@ -1,0 +1,26 @@
+#! /bin/sh
+
+# Based on the Liquibase launch script http://www.liquibase.org/
+
+## resolve links - $0 may be a symlink
+PRG="$0"
+while [ -h "$PRG" ] ; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+  PRG="$link"
+  else
+  PRG=`dirname "$PRG"`"/$link"
+  fi
+done
+
+SWAGGER_CODEGEN_HOME=`dirname "$PRG"`
+
+# make it fully qualified
+SWAGGER_CODEGEN_HOME=`cd "$SWAGGER_CODEGEN_HOME" && pwd`
+#echo "SWAGGER_CODEGEN Home: $SWAGGER_CODEGEN_HOME"
+ 
+# add any JVM options here
+JAVA_OPTS=
+
+java -jar $JAVA_OPTS ${SWAGGER_CODEGEN_HOME}/swagger-codegen-cli.jar ${1+"$@"} 

@@ -1,0 +1,1522 @@
+swagger: '2.0'
+info:
+  description: Habitat API
+  version: V0.0.1
+  title: Habitat repository and authorization API
+  contact:
+    name: Zack Ives
+    url: 'https://bitbucket.org/penndb/hab-repo'
+host: 'localhost:8088'
+tags:
+  - name: provenance
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  '/auth/services/{service}/user/{username}':
+    get:
+      summary: Returns whether a user credential is valid for a service
+      operationId: IsRegistered
+      produces:
+        - application/json
+      parameters:
+        - name: service
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+    post:
+      summary: Adds a service credential for the user
+      operationId: AddCredential
+      produces:
+        - application/json
+      parameters:
+        - name: service
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: credentials
+          required: true
+          schema:
+            $ref: '#/definitions/UserCredentials'
+          x-examples:
+            application/json: '{service:''local'',password=''password''}'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/UserInfo'
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/organizations/{organization}/group/{group}':
+    post:
+      summary: Adds a permissions group to an organization
+      operationId: AddGroup
+      produces:
+        - application/json
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: integer
+        - name: group
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: details
+          required: true
+          schema:
+            $ref: '#/definitions/GroupDetails'
+          x-examples:
+            application/json: '{parentGroupId:1}'
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/organizations/{orgname}':
+    post:
+      summary: Adds an organization
+      operationId: AddOrganization
+      produces:
+        - application/json
+      parameters:
+        - name: orgname
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: details
+          required: true
+          schema:
+            $ref: '#/definitions/OrgDetails'
+          x-examples:
+            application/json: >-
+              {street1:'s1',street2:'s2',city:'c',state:'st',zip:'zip',country:'c',phone:'p',web:'http://'}
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/types/{permname}':
+    post:
+      summary: Adds a new labeled permission type
+      operationId: AddPermission
+      produces:
+        - application/json
+      parameters:
+        - name: permname
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/{groupname}/group/{subgroup}':
+    post:
+      summary: Adds a subgroup to a group
+      operationId: AddSubgroupToGroup
+      produces:
+        - application/json
+      parameters:
+        - name: groupname
+          in: path
+          required: true
+          type: string
+        - name: subgroup
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/{groupname}/user/{username}':
+    post:
+      summary: Adds a user to a group
+      operationId: AddUserToGroup
+      produces:
+        - application/json
+      parameters:
+        - name: groupname
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/organizations/{orgId}/user/{username}':
+    post:
+      summary: Adds a user to an organization
+      operationId: AddUserToOrganization
+      produces:
+        - application/json
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          type: integer
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/tokens/{username}':
+    post:
+      summary: Requests a new token
+      operationId: GetTokenRoute
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: credentials
+          required: true
+          schema:
+            $ref: '#/definitions/UserCredentials'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/WebToken'
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+  '/auth/credentials/{username}':
+    post:
+      summary: Creates a new user
+      operationId: CreateNewUser
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: userfields
+          required: true
+          schema:
+            $ref: '#/definitions/UserInfo'
+          x-examples:
+            application/json: >-
+              {email:'my@mail',password='password',firstname='Bob',lastname='Smith',organization='Penn'}
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/UserInfo'
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+    put:
+      summary: Updates user properties
+      operationId: UpdateUser
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: userfields
+          required: true
+          schema:
+            $ref: '#/definitions/UserInfo'
+          x-examples:
+            application/json: >-
+              {email:'my@mail',password='password',firstname='Bob',lastname='Smith',organization='Penn'}
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/UserInfo'
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}/neighbors/out':
+    get:
+      tags:
+        - provenance
+      summary: Get the outgoing neighbors of the given prov token
+      operationId: getConnectedFrom
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+        - name: label
+          in: query
+          required: false
+          type: string
+      responses:
+        '200':
+          description: outgoing neighbors retrieved
+          schema:
+            $ref: '#/definitions/ProvTokenSetModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}/neighbors/in':
+    get:
+      tags:
+        - provenance
+      summary: Get the incoming neighbors of the given prov token
+      operationId: getConnectedTo
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+        - name: label
+          in: query
+          required: false
+          type: string
+      responses:
+        '200':
+          description: incoming neighbors retrieved
+          schema:
+            $ref: '#/definitions/ProvTokenSetModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}/links/out':
+    get:
+      tags:
+        - provenance
+      summary: Get the outgoing edges of the given prov token
+      operationId: getEdgesFrom
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+        - name: resource
+          in: query
+          required: false
+          type: string
+      responses:
+        '200':
+          description: outgoing links retrieved
+          schema:
+            $ref: '#/definitions/ProvEdgeSetModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}/links/in':
+    get:
+      tags:
+        - provenance
+      summary: Get the incoming edges of the given prov token
+      operationId: getEdgesTo
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+        - name: resource
+          in: query
+          required: false
+          type: string
+      responses:
+        '200':
+          description: incoming links retrieved
+          schema:
+            $ref: '#/definitions/ProvEdgeSetModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/id/{groupId}':
+    get:
+      summary: Gets a group name from its integer ID
+      operationId: GetGroupFromId
+      produces:
+        - application/json
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: string
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/name/{groupName}':
+    get:
+      summary: Gets a group's ID from its name
+      operationId: GetGroupId
+      produces:
+        - application/json
+      parameters:
+        - name: groupName
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/credentials/{username}/groups/id':
+    get:
+      summary: Gets the IDs of groups in which a user is directly a member
+      operationId: GetGroupIdsForUser
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/objects/{object}/group/{groupName}':
+    get:
+      summary: Gets the group's permissions on an object
+      operationId: GetGroupPermissionsOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: groupName
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/credentials/{username}/groups':
+    get:
+      summary: Gets the groups in which a user is directly a member
+      operationId: GetGroupsForUser
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/organizations/id/{orgId}':
+    get:
+      summary: Gets an organization name from its integer ID
+      operationId: GetOrganizationFromId
+      produces:
+        - application/json
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: string
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/organizations/name/{orgName}':
+    get:
+      summary: Gets an organization ID from its name
+      operationId: GetOrganizationId
+      produces:
+        - application/json
+      parameters:
+        - name: orgName
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/id/{groupId}/parents/id':
+    get:
+      summary: Gets the IDs of parent groups
+      operationId: GetParentGroupIds
+      produces:
+        - application/json
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/groups/name/{groupName}/parents/name':
+    get:
+      summary: Gets the groups in which a user is directly a member
+      operationId: GetParentGroups
+      produces:
+        - application/json
+      parameters:
+        - name: groupName
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/id/{id}/name':
+    get:
+      summary: Gets a permission's name from its integer ID
+      operationId: GetPermissionFromId
+      produces:
+        - application/json
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: string
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/name/{name}/id':
+    get:
+      summary: Gets a permission's ID from its name
+      operationId: GetPermissionId
+      produces:
+        - application/json
+      parameters:
+        - name: name
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: integer
+            format: int32
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}':
+    get:
+      tags:
+        - provenance
+      summary: Get the tuple associated with a provenance token
+      operationId: getProvenanceData
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Node retrieved
+          schema:
+            $ref: '#/definitions/TupleWithSchemaModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+    put:
+      tags:
+        - provenance
+      summary: Store a provenance token with its location
+      operationId: storeProvenanceNode
+      consumes:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/StoreNodeModel'
+      responses:
+        '204':
+          description: Node created
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/provenance/nodes/{token}/location':
+    get:
+      tags:
+        - provenance
+      summary: Get the location of a provenance token
+      operationId: getProvenanceLocation
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Specifier retrieved
+          schema:
+            $ref: '#/definitions/ProvSpecifierModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  /provenance/nodes:
+    get:
+      tags:
+        - provenance
+      summary: Get the provenance graph's nodes
+      operationId: getProvenanceNodes
+      produces:
+        - application/json
+      parameters:
+        - name: resource
+          in: query
+          required: false
+          type: string
+      responses:
+        '200':
+          description: nodes retrieved
+          schema:
+            $ref: '#/definitions/ProvNodeMapModel'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '404':
+          description: Node not found
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/credentials/{username}/info':
+    get:
+      summary: Gets a user's info
+      operationId: GetUserInfo
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/UserInfo'
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/objects/{object}/user/{username}':
+    get:
+      summary: Gets the user's permissions on an object
+      operationId: GetUserPermissionsOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: object
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/objects/{object}/group/{groupName}/{permname}':
+    post:
+      summary: Grants a group a permission on an object
+      operationId: GrantGroupPermissionOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: groupName
+          in: path
+          required: true
+          type: string
+        - name: permname
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+    delete:
+      summary: Revokes a group a permission on an object
+      operationId: RevokeGroupPermissionOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: groupName
+          in: path
+          required: true
+          type: string
+        - name: permname
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/perms/objects/{object}/user/{username}/{permname}':
+    post:
+      summary: Grants a user a permission on an object
+      operationId: GrantUserPermissionOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+        - name: permname
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+    delete:
+      summary: Revokes a user a permission on an object
+      operationId: RevokeUserPermissionOn
+      produces:
+        - application/json
+      parameters:
+        - name: object
+          in: path
+          required: true
+          type: string
+        - name: username
+          in: path
+          required: true
+          type: string
+        - name: permname
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  '/auth/services/local/user/{username}/credential':
+    post:
+      summary: Returns whether a local user credential is valid
+      operationId: IsValidCredential
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: credentials
+          required: true
+          schema:
+            $ref: '#/definitions/UserCredentials'
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: boolean
+        '400':
+          description: Invalid input data
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+  /provenance/links:
+    post:
+      tags:
+        - provenance
+      summary: Store a provenance link between tokens
+      operationId: storeProvenanceLink
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/StoreLinkModel'
+      responses:
+        '204':
+          description: Link created
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/ResponseError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ResponseError'
+      security:
+        - jwt: []
+securityDefinitions:
+  jwt:
+    type: apiKey
+    name: api_key
+    in: header
+definitions:
+  UserInfo:
+    type: object
+    properties:
+      username:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      firstname:
+        type: string
+      lastname:
+        type: string
+      street1:
+        type: string
+      street2:
+        type: string
+      city:
+        type: string
+      state:
+        type: string
+      zip:
+        type: string
+      country:
+        type: string
+      phone:
+        type: string
+      title:
+        type: string
+      organization:
+        type: string
+  ResponseError:
+    type: object
+    properties:
+      message:
+        type: string
+  UserCredentials:
+    type: object
+    properties:
+      password:
+        type: string
+  GroupDetails:
+    type: object
+    properties:
+      parentGroup:
+        type: string
+  OrgDetails:
+    type: object
+  WebToken:
+    type: object
+    properties:
+      token:
+        type: string
+  IDModel:
+    type: object
+    properties:
+      id:
+        type: string
+  ProvExpressionModel:
+    allOf:
+      - $ref: '#/definitions/ProvSpecifierModel'
+      - type: object
+        required:
+          - operation
+        properties:
+          operation:
+            type: string
+          operands:
+            type: array
+            items:
+              $ref: '#/definitions/ProvSpecifierModel'
+        description: A prov expression
+  ProvLocationModel:
+    allOf:
+      - $ref: '#/definitions/ProvSpecifierModel'
+      - type: object
+        required:
+          - field
+          - position
+        properties:
+          stream:
+            $ref: '#/definitions/IDModel'
+          field:
+            type: string
+          position:
+            type: array
+            items:
+              type: integer
+              format: int32
+        description: A prov location expression
+  ProvSpecifierModel:
+    type: object
+    description: 'Either a ProvTokenModel, ProvLocationModel, or ProvExpressionModel'
+  ProvTokenModel:
+    allOf:
+      - $ref: '#/definitions/ProvSpecifierModel'
+      - type: object
+        required:
+          - tokenValue
+        properties:
+          tokenValue:
+            type: string
+        description: A prov token expression
+  ProvTokenSetModel:
+    type: object
+    required:
+      - tokens
+    properties:
+      tokens:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: '#/definitions/ProvTokenModel'
+  BooleanFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - BOOLEAN
+          value:
+            type: boolean
+        description: a boolean field
+  DoubleFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - DOUBLE
+          value:
+            type: number
+            format: double
+        description: a double field
+  FieldModel:
+    type: object
+    required:
+      - name
+      - type
+      - value
+    discriminator: type
+    properties:
+      name:
+        type: string
+      value:
+        type: object
+      type:
+        type: string
+        enum:
+          - BOOLEAN
+          - DOUBLE
+          - INTEGER
+          - STRING
+          - PROV_TOKEN
+          - PROV_SPECIFIER
+          - LONG
+    description: A field in a TupleModel
+  IntegerFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - INTEGER
+          value:
+            type: integer
+            format: int32
+        description: a integer field
+  LongFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - LONG
+          value:
+            type: integer
+            format: int64
+        description: a long field
+  ProvEdgeModel:
+    type: object
+    required:
+      - endpointProvToken
+    properties:
+      endpointProvToken:
+        type: string
+      tupleWithSchema:
+        $ref: '#/definitions/TupleWithSchemaModel'
+  ProvEdgeSetModel:
+    type: object
+    required:
+      - edges
+    properties:
+      edges:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: '#/definitions/ProvEdgeModel'
+  ProvSpecifierFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - PROV_SPECIFIER
+          value:
+            $ref: '#/definitions/ProvSpecifierModel'
+        description: a ProvSpecifier field
+  ProvTokenFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - PROV_TOKEN
+          value:
+            $ref: '#/definitions/ProvTokenModel'
+        description: a ProvToken field
+  StringFieldModel:
+    allOf:
+      - $ref: '#/definitions/FieldModel'
+      - type: object
+        required:
+          - type
+          - value
+        properties:
+          type:
+            type: string
+            enum:
+              - STRING
+          value:
+            type: string
+        description: a String field
+  TupleWithSchemaModel:
+    type: object
+    required:
+      - lookupKeys
+      - schemaName
+      - tuple
+    properties:
+      schemaName:
+        type: string
+      lookupKeys:
+        type: array
+        items:
+          type: string
+      tuple:
+        type: array
+        items:
+          $ref: '#/definitions/FieldModel'
+    description: a tuple
+  ProvNodeMapModel:
+    type: object
+    required:
+      - nodes
+    properties:
+      nodes:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/StoreNodeModel'
+  StoreNodeModel:
+    type: object
+    required:
+      - provSpecifier
+    properties:
+      provSpecifier:
+        $ref: '#/definitions/ProvSpecifierModel'
+      tupleWithSchema:
+        $ref: '#/definitions/TupleWithSchemaModel'
+  StoreLinkModel:
+    type: object
+    required:
+      - from
+      - to
+    properties:
+      from:
+        type: array
+        items:
+          $ref: '#/definitions/ProvTokenModel'
+      to:
+        $ref: '#/definitions/ProvTokenModel'
+      label:
+        type: string
+      tupleWithSchema:
+        $ref: '#/definitions/TupleWithSchemaModel'
