@@ -12,3 +12,5 @@ ${SWAGGER_BIN}/swagger-codegen generate \
   -l python \
   --additional-properties packageName=${PACKAGE} \
   -o ${OUTPUT_DIR}
+
+  cp LICENSE.txt ${OUTPUT_DIR}
