@@ -14,7 +14,7 @@
 from setuptools import setup, find_packages  # noqa: H301
 
 NAME = "pennprov"
-VERSION = "1.0.0.rc2"
+VERSION = "1.0.0rc3"
 # To install the library, run the following
 #
 # python setup.py install
@@ -29,7 +29,7 @@ setup(
     version=VERSION,
     description="Habitat repository and authorization API",
     author_email="zives@seas.upenn.edu",
-    url="https://bitbucket.org/penndb/hab-repo",
+    url="https://bitbucket.org/penndb/hab-python-client",
     keywords=["Swagger", "Habitat repository and authorization API"],
     install_requires=REQUIRES,
     packages=find_packages(),
