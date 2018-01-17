@@ -142,8 +142,3 @@ Class | Method | HTTP request | Description
 - **API key parameter name**: api_key
 - **Location**: HTTP header
 
-
-## Author
-
-zives@seas.upenn.edu
-
