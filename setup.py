@@ -14,7 +14,7 @@
 from setuptools import setup, find_packages  # noqa: H301
 
 NAME = "pennprov"
-VERSION = "1.0.0rc3"
+VERSION = "1.0.0rc5"
 # To install the library, run the following
 #
 # python setup.py install

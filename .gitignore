@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-python_build.sh
+python_build.bash
 .Python
 env/
 build/
