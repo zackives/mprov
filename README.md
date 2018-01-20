@@ -10,7 +10,7 @@ For more information, please visit [https://bitbucket.org/penndb/hab-repo](https
 
 ## Requirements.
 
-Python 2.7 and 3.4+
+Python 2.7 and 3.4+; Docker and Docker Compose, if setting up the server in a Docker container.
 
 ## Installation & Usage
 ### pip install
@@ -27,7 +27,7 @@ Then import the package:
 import pennprov 
 ```
 
-## Getting Started
+## Getting Started - Client
 
 The following illustrates a simple use of the API to obtain a authentication token and then store and retrieve a node.
 
@@ -85,6 +85,17 @@ if __name__ == '__main__':
     main()
 
 ```
+
+## Getting Started - Docker
+
+If you want to have a simple Docker container to test the above, do the following.
+
+```bash
+cd docker-container
+docker-compose up
+```
+
+Then (after waiting some time!) open your Web browser to http://localhost:8088 and click on `Sign up`.  Create a new user called `YOUR_USERNAME` with password `YOUR_PASSWORD`.
 
 ## Documentation for API Endpoints
 
