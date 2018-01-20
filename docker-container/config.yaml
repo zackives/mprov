@@ -1,0 +1,26 @@
+server:
+ port: 8088
+ maxThreads: 50
+ timeoutMsec: 30000
+ salt: habitat1
+
+rdbms:
+ host: postgres
+ user: postgres
+ #password: ${POSGRES_PASSWORD}
+ password: habitat1
+ namespace: HABITAT
+
+graph:
+ host: neo4j
+ user: neo4j
+ #password: ${NEO4J_PASSWORD}
+ password: habitat1
+
+blob:
+ host: localhost
+ user: AKIAIOSFODNN7HABITAT
+ password: wJalrXUtnFEMI/K7MDENG/bPxRfiCYHABITAT1KY
+ region: us-east-1
+ host: 127.0.0.1:9000
+ 
