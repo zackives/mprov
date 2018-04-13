@@ -1,76 +1,25 @@
-# pennprov.ProvenanceApi
+# pennprov.PermissionApi
 
 All URIs are relative to *http://localhost:8088*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**create_provenance_graph**](ProvenanceApi.md#create_provenance_graph) | **PUT** /provenance/graphs/{resource} | Create a provenance graph
-[**get_connected_from**](ProvenanceApi.md#get_connected_from) | **GET** /provenance/graphs/{resource}/nodes/{token}/neighbors/out | Get the outgoing neighbors of the given prov token
-[**get_connected_to**](ProvenanceApi.md#get_connected_to) | **GET** /provenance/graphs/{resource}/nodes/{token}/neighbors/in | Get the incoming neighbors of the given prov token
-[**get_edges_from**](ProvenanceApi.md#get_edges_from) | **GET** /provenance/graphs/{resource}/nodes/{token}/links/out | Get the outgoing edges of the given prov token
-[**get_edges_to**](ProvenanceApi.md#get_edges_to) | **GET** /provenance/graphs/{resource}/nodes/{token}/links/in | Get the incoming edges of the given prov token
-[**get_provenance_data**](ProvenanceApi.md#get_provenance_data) | **GET** /provenance/graphs/{resource}/nodes/{token} | Get the tuple associated with a provenance token
-[**get_provenance_location**](ProvenanceApi.md#get_provenance_location) | **GET** /provenance/graphs/{resource}/nodes/{token}/location | Get the location of a provenance token
-[**get_provenance_nodes**](ProvenanceApi.md#get_provenance_nodes) | **GET** /provenance/graphs/{resource}/nodes | Get the provenance graph&#39;s nodes
-[**store_provenance_link**](ProvenanceApi.md#store_provenance_link) | **POST** /provenance/graphs/{resource}/links | Store a provenance link between tokens
-[**store_provenance_node**](ProvenanceApi.md#store_provenance_node) | **PUT** /provenance/graphs/{resource}/nodes/{token} | Store a provenance token with its location
+[**add_permission**](PermissionApi.md#add_permission) | **POST** /perms/types/{permname} | Adds a new labeled permission type
+[**get_group_permissions_on**](PermissionApi.md#get_group_permissions_on) | **GET** /perms/objects/{object}/group/{groupName} | Gets the group&#39;s permissions on an object
+[**get_object_ids**](PermissionApi.md#get_object_ids) | **GET** /perms/name/{permname}/user/{username} | Gets the object ids for which the user has the given permission
+[**get_permission_from_id**](PermissionApi.md#get_permission_from_id) | **GET** /perms/id/{id}/name | Gets a permission&#39;s name from its integer ID
+[**get_permission_id**](PermissionApi.md#get_permission_id) | **GET** /perms/name/{name}/id | Gets a permission&#39;s ID from its name
+[**get_user_permissions_on**](PermissionApi.md#get_user_permissions_on) | **GET** /perms/objects/{object}/user/{username} | Gets the user&#39;s permissions on an object
+[**grant_group_permission_on**](PermissionApi.md#grant_group_permission_on) | **POST** /perms/objects/{object}/group/{groupName}/{permname} | Grants a group a permission on an object
+[**grant_user_permission_on**](PermissionApi.md#grant_user_permission_on) | **POST** /perms/objects/{object}/user/{username}/{permname} | Grants a user a permission on an object
+[**revoke_group_permission_on**](PermissionApi.md#revoke_group_permission_on) | **DELETE** /perms/objects/{object}/group/{groupName}/{permname} | Revokes a group a permission on an object
+[**revoke_user_permission_on**](PermissionApi.md#revoke_user_permission_on) | **DELETE** /perms/objects/{object}/user/{username}/{permname} | Revokes a user a permission on an object
 
 
-# **create_provenance_graph**
-> create_provenance_graph(resource)
+# **add_permission**
+> int add_permission(permname)
 
-Create a provenance graph
-
-### Example
-```python
-from __future__ import print_function
-import time
-import pennprov
-from pennprov.rest import ApiException
-from pprint import pprint
-
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
-
-# create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-
-try:
-    # Create a provenance graph
-    api_instance.create_provenance_graph(resource)
-except ApiException as e:
-    print("Exception when calling ProvenanceApi->create_provenance_graph: %s\n" % e)
-```
-
-### Parameters
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
-
-### Return type
-
-void (empty response body)
-
-### Authorization
-
-[jwt](../README.md#jwt)
-
-### HTTP request headers
-
- - **Content-Type**: application/json
- - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **get_connected_from**
-> ProvTokenSetModel get_connected_from(resource, token, label=label)
-
-Get the outgoing neighbors of the given prov token
+Adds a new labeled permission type
 
 ### Example
 ```python
@@ -87,30 +36,26 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
-label = 'label_example' # str |  (optional)
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+permname = 'permname_example' # str | 
 
 try:
-    # Get the outgoing neighbors of the given prov token
-    api_response = api_instance.get_connected_from(resource, token, label=label)
+    # Adds a new labeled permission type
+    api_response = api_instance.add_permission(permname)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_connected_from: %s\n" % e)
+    print("Exception when calling PermissionApi->add_permission: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
- **label** | **str**|  | [optional] 
+ **permname** | **str**|  | 
 
 ### Return type
 
-[**ProvTokenSetModel**](ProvTokenSetModel.md)
+**int**
 
 ### Authorization
 
@@ -123,10 +68,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_connected_to**
-> ProvTokenSetModel get_connected_to(resource, token, label=label)
+# **get_group_permissions_on**
+> list[object] get_group_permissions_on(object, group_name)
 
-Get the incoming neighbors of the given prov token
+Gets the group's permissions on an object
 
 ### Example
 ```python
@@ -143,30 +88,28 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
-label = 'label_example' # str |  (optional)
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+group_name = 'group_name_example' # str | 
 
 try:
-    # Get the incoming neighbors of the given prov token
-    api_response = api_instance.get_connected_to(resource, token, label=label)
+    # Gets the group's permissions on an object
+    api_response = api_instance.get_group_permissions_on(object, group_name)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_connected_to: %s\n" % e)
+    print("Exception when calling PermissionApi->get_group_permissions_on: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
- **label** | **str**|  | [optional] 
+ **object** | **str**|  | 
+ **group_name** | **str**|  | 
 
 ### Return type
 
-[**ProvTokenSetModel**](ProvTokenSetModel.md)
+**list[object]**
 
 ### Authorization
 
@@ -179,10 +122,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_edges_from**
-> ProvEdgeSetModel get_edges_from(resource, token)
+# **get_object_ids**
+> list[object] get_object_ids(permname, username)
 
-Get the outgoing edges of the given prov token
+Gets the object ids for which the user has the given permission
 
 ### Example
 ```python
@@ -199,28 +142,28 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+permname = 'permname_example' # str | 
+username = 'username_example' # str | 
 
 try:
-    # Get the outgoing edges of the given prov token
-    api_response = api_instance.get_edges_from(resource, token)
+    # Gets the object ids for which the user has the given permission
+    api_response = api_instance.get_object_ids(permname, username)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_edges_from: %s\n" % e)
+    print("Exception when calling PermissionApi->get_object_ids: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
+ **permname** | **str**|  | 
+ **username** | **str**|  | 
 
 ### Return type
 
-[**ProvEdgeSetModel**](ProvEdgeSetModel.md)
+**list[object]**
 
 ### Authorization
 
@@ -233,10 +176,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_edges_to**
-> ProvEdgeSetModel get_edges_to(resource, token)
+# **get_permission_from_id**
+> str get_permission_from_id(id)
 
-Get the incoming edges of the given prov token
+Gets a permission's name from its integer ID
 
 ### Example
 ```python
@@ -253,28 +196,26 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+id = 56 # int | 
 
 try:
-    # Get the incoming edges of the given prov token
-    api_response = api_instance.get_edges_to(resource, token)
+    # Gets a permission's name from its integer ID
+    api_response = api_instance.get_permission_from_id(id)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_edges_to: %s\n" % e)
+    print("Exception when calling PermissionApi->get_permission_from_id: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
+ **id** | **int**|  | 
 
 ### Return type
 
-[**ProvEdgeSetModel**](ProvEdgeSetModel.md)
+**str**
 
 ### Authorization
 
@@ -287,10 +228,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_provenance_data**
-> TupleWithSchemaModel get_provenance_data(resource, token)
+# **get_permission_id**
+> int get_permission_id(name)
 
-Get the tuple associated with a provenance token
+Gets a permission's ID from its name
 
 ### Example
 ```python
@@ -307,28 +248,26 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+name = 'name_example' # str | 
 
 try:
-    # Get the tuple associated with a provenance token
-    api_response = api_instance.get_provenance_data(resource, token)
+    # Gets a permission's ID from its name
+    api_response = api_instance.get_permission_id(name)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_provenance_data: %s\n" % e)
+    print("Exception when calling PermissionApi->get_permission_id: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
+ **name** | **str**|  | 
 
 ### Return type
 
-[**TupleWithSchemaModel**](TupleWithSchemaModel.md)
+**int**
 
 ### Authorization
 
@@ -341,10 +280,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_provenance_location**
-> ProvSpecifierModel get_provenance_location(resource, token)
+# **get_user_permissions_on**
+> list[object] get_user_permissions_on(object, username)
 
-Get the location of a provenance token
+Gets the user's permissions on an object
 
 ### Example
 ```python
@@ -361,28 +300,28 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+username = 'username_example' # str | 
 
 try:
-    # Get the location of a provenance token
-    api_response = api_instance.get_provenance_location(resource, token)
+    # Gets the user's permissions on an object
+    api_response = api_instance.get_user_permissions_on(object, username)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_provenance_location: %s\n" % e)
+    print("Exception when calling PermissionApi->get_user_permissions_on: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
+ **object** | **str**|  | 
+ **username** | **str**|  | 
 
 ### Return type
 
-[**ProvSpecifierModel**](ProvSpecifierModel.md)
+**list[object]**
 
 ### Authorization
 
@@ -395,10 +334,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **get_provenance_nodes**
-> ProvNodeMapModel get_provenance_nodes(resource)
+# **grant_group_permission_on**
+> bool grant_group_permission_on(object, group_name, permname)
 
-Get the provenance graph's nodes
+Grants a group a permission on an object
 
 ### Example
 ```python
@@ -415,26 +354,30 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+group_name = 'group_name_example' # str | 
+permname = 'permname_example' # str | 
 
 try:
-    # Get the provenance graph's nodes
-    api_response = api_instance.get_provenance_nodes(resource)
+    # Grants a group a permission on an object
+    api_response = api_instance.grant_group_permission_on(object, group_name, permname)
     pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->get_provenance_nodes: %s\n" % e)
+    print("Exception when calling PermissionApi->grant_group_permission_on: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
+ **object** | **str**|  | 
+ **group_name** | **str**|  | 
+ **permname** | **str**|  | 
 
 ### Return type
 
-[**ProvNodeMapModel**](ProvNodeMapModel.md)
+**bool**
 
 ### Authorization
 
@@ -447,10 +390,10 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **store_provenance_link**
-> store_provenance_link(resource, body)
+# **grant_user_permission_on**
+> bool grant_user_permission_on(object, username, permname)
 
-Store a provenance link between tokens
+Grants a user a permission on an object
 
 ### Example
 ```python
@@ -467,27 +410,30 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-body = pennprov.StoreLinkModel() # StoreLinkModel | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+username = 'username_example' # str | 
+permname = 'permname_example' # str | 
 
 try:
-    # Store a provenance link between tokens
-    api_instance.store_provenance_link(resource, body)
+    # Grants a user a permission on an object
+    api_response = api_instance.grant_user_permission_on(object, username, permname)
+    pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->store_provenance_link: %s\n" % e)
+    print("Exception when calling PermissionApi->grant_user_permission_on: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **body** | [**StoreLinkModel**](StoreLinkModel.md)|  | 
+ **object** | **str**|  | 
+ **username** | **str**|  | 
+ **permname** | **str**|  | 
 
 ### Return type
 
-void (empty response body)
+**bool**
 
 ### Authorization
 
@@ -500,10 +446,10 @@ void (empty response body)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **store_provenance_node**
-> store_provenance_node(resource, token, body)
+# **revoke_group_permission_on**
+> bool revoke_group_permission_on(object, group_name, permname)
 
-Store a provenance token with its location
+Revokes a group a permission on an object
 
 ### Example
 ```python
@@ -520,29 +466,86 @@ configuration.api_key['api_key'] = 'YOUR_API_KEY'
 # configuration.api_key_prefix['api_key'] = 'Bearer'
 
 # create an instance of the API class
-api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
-body = pennprov.StoreNodeModel() # StoreNodeModel | 
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+group_name = 'group_name_example' # str | 
+permname = 'permname_example' # str | 
 
 try:
-    # Store a provenance token with its location
-    api_instance.store_provenance_node(resource, token, body)
+    # Revokes a group a permission on an object
+    api_response = api_instance.revoke_group_permission_on(object, group_name, permname)
+    pprint(api_response)
 except ApiException as e:
-    print("Exception when calling ProvenanceApi->store_provenance_node: %s\n" % e)
+    print("Exception when calling PermissionApi->revoke_group_permission_on: %s\n" % e)
 ```
 
 ### Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **resource** | **str**|  | 
- **token** | **str**|  | 
- **body** | [**StoreNodeModel**](StoreNodeModel.md)|  | 
+ **object** | **str**|  | 
+ **group_name** | **str**|  | 
+ **permname** | **str**|  | 
 
 ### Return type
 
-void (empty response body)
+**bool**
+
+### Authorization
+
+[jwt](../README.md#jwt)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **revoke_user_permission_on**
+> bool revoke_user_permission_on(object, username, permname)
+
+Revokes a user a permission on an object
+
+### Example
+```python
+from __future__ import print_function
+import time
+import pennprov
+from pennprov.rest import ApiException
+from pprint import pprint
+
+# Configure API key authorization: jwt
+configuration = pennprov.Configuration()
+configuration.api_key['api_key'] = 'YOUR_API_KEY'
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['api_key'] = 'Bearer'
+
+# create an instance of the API class
+api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
+object = 'object_example' # str | 
+username = 'username_example' # str | 
+permname = 'permname_example' # str | 
+
+try:
+    # Revokes a user a permission on an object
+    api_response = api_instance.revoke_user_permission_on(object, username, permname)
+    pprint(api_response)
+except ApiException as e:
+    print("Exception when calling PermissionApi->revoke_user_permission_on: %s\n" % e)
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **object** | **str**|  | 
+ **username** | **str**|  | 
+ **permname** | **str**|  | 
+
+### Return type
+
+**bool**
 
 ### Authorization
 
