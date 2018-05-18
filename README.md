@@ -45,9 +45,11 @@ def main():
     """Get a token and store a node"""
     # create instances of the API classes
     configuration = pennprov.configuration.Configuration()
-    auth_api = pennprov.AuthenticationApi()
-    prov_api = pennprov.ProvenanceApi()
-    prov_dm_api = pennprov.ProvDmApi()
+    configuration.host = "http://localhost:8088"
+    api_client = pennprov.ApiClient(configuration)    
+    auth_api = pennprov.AuthenticationApi(api_client)
+    prov_api = pennprov.ProvenanceApi(api_client)
+    prov_dm_api = pennprov.ProvDmApi(api_client)
     username = "YOUR_USERNAME"
     credentials = pennprov.UserCredentials(
         "YOUR_PASSWORD")
