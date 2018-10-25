@@ -104,7 +104,7 @@ def main():
             type='DERIVATION', subject_id=outputProvId, object_id=inputProvId,
             attributes=[pennprov.Attribute(name=pennprov.QualifiedName(namespace, 'booleanAttr'), value=True, type='BOOLEAN'),
                         pennprov.Attribute(name=pennprov.QualifiedName(namespace, 'anotherStringAttr'), value='attrValue', type='STRING')])
-        prov_dm_api.store_relation(resource=prov_dm_graph, body=wasDerivedFrom)
+        prov_dm_api.store_relation(resource=prov_dm_graph, body=wasDerivedFrom, label='wasDerivedFrom')
 
         # And stil use the base ProvenanceApi to retrieve information about the PROV DM graph
         edge = prov_api.get_edges_from(prov_dm_graph, outputProvId)
