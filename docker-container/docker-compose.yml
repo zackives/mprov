@@ -24,7 +24,7 @@ services:
 
   penn-provenance:
     restart: always
-    image: johnfr/penn-provenance:v2
+    image: johnfr/penn-provenance:v2.1
     ports:
      - '8088:8088'
     depends_on:
