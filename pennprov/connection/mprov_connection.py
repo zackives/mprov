@@ -3,7 +3,7 @@ from pprint import pprint
 
 import pennprov
 from pennprov.rest import ApiException
-from mprov.metadata.stream_metadata import BasicSchema, BasicTuple
+from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 
 
 class MProvConnection:

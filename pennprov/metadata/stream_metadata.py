@@ -49,9 +49,9 @@ class BasicSchema:
         if len(args) == 0:
             return self.create_tuple_blank()
         elif isinstance(args[0], list):
-            return self.create_tuple_list(self, args[0])
+            return self.create_tuple_list(args[0])
         else:
-            return self.create_tuple_dict(self, args[0])
+            return self.create_tuple_dict(args[0])
 
     def create_tuple_blank(self):
         return BasicTuple(self)
