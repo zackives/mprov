@@ -37,11 +37,11 @@ class ProvDmApi(object):
         """Store a PROV DM node  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_node(resource, token, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_node(resource, token, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param NodeModel body: (required)
@@ -50,7 +50,7 @@ class ProvDmApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.store_node_with_http_info(resource, token, body, **kwargs)  # noqa: E501
         else:
             (data) = self.store_node_with_http_info(resource, token, body, **kwargs)  # noqa: E501
@@ -60,11 +60,11 @@ class ProvDmApi(object):
         """Store a PROV DM node  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_node_with_http_info(resource, token, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_node_with_http_info(resource, token, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param NodeModel body: (required)
@@ -74,7 +74,7 @@ class ProvDmApi(object):
         """
 
         all_params = ['resource', 'token', 'body']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -140,7 +140,7 @@ class ProvDmApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -150,11 +150,11 @@ class ProvDmApi(object):
         """Store a relation between PROV DM tokens  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_relation(resource, body, label, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_relation(resource, body, label, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param RelationModel body: (required)
         :param str label: (required)
@@ -163,7 +163,7 @@ class ProvDmApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.store_relation_with_http_info(resource, body, label, **kwargs)  # noqa: E501
         else:
             (data) = self.store_relation_with_http_info(resource, body, label, **kwargs)  # noqa: E501
@@ -173,11 +173,11 @@ class ProvDmApi(object):
         """Store a relation between PROV DM tokens  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_relation_with_http_info(resource, body, label, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_relation_with_http_info(resource, body, label, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param RelationModel body: (required)
         :param str label: (required)
@@ -187,7 +187,7 @@ class ProvDmApi(object):
         """
 
         all_params = ['resource', 'body', 'label']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -253,7 +253,7 @@ class ProvDmApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),

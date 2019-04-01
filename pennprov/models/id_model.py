@@ -89,6 +89,9 @@ class IDModel(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(IDModel, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

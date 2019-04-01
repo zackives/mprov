@@ -89,6 +89,9 @@ class UserCredentials(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(UserCredentials, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

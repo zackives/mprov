@@ -37,18 +37,18 @@ class PermissionApi(object):
         """Adds a new labeled permission type  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.add_permission(permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.add_permission(permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str permname: (required)
         :return: int
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.add_permission_with_http_info(permname, **kwargs)  # noqa: E501
         else:
             (data) = self.add_permission_with_http_info(permname, **kwargs)  # noqa: E501
@@ -58,11 +58,11 @@ class PermissionApi(object):
         """Adds a new labeled permission type  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.add_permission_with_http_info(permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.add_permission_with_http_info(permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str permname: (required)
         :return: int
                  If the method is called asynchronously,
@@ -70,7 +70,7 @@ class PermissionApi(object):
         """
 
         all_params = ['permname']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -124,21 +124,21 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='int',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
             collection_formats=collection_formats)
 
     def get_group_permissions_on(self, object, group_name, **kwargs):  # noqa: E501
-        """Gets the group&#39;s permissions on an object  # noqa: E501
+        """Gets the group's permissions on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_group_permissions_on(object, group_name, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_group_permissions_on(object, group_name, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :return: list[object]
@@ -146,21 +146,21 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_group_permissions_on_with_http_info(object, group_name, **kwargs)  # noqa: E501
         else:
             (data) = self.get_group_permissions_on_with_http_info(object, group_name, **kwargs)  # noqa: E501
             return data
 
     def get_group_permissions_on_with_http_info(self, object, group_name, **kwargs):  # noqa: E501
-        """Gets the group&#39;s permissions on an object  # noqa: E501
+        """Gets the group's permissions on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_group_permissions_on_with_http_info(object, group_name, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_group_permissions_on_with_http_info(object, group_name, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :return: list[object]
@@ -169,7 +169,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'group_name']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -229,7 +229,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='list[object]',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -239,11 +239,11 @@ class PermissionApi(object):
         """Gets the object ids for which the user has the given permission  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_object_ids(permname, username, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_object_ids(permname, username, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str permname: (required)
         :param str username: (required)
         :return: list[object]
@@ -251,7 +251,7 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_object_ids_with_http_info(permname, username, **kwargs)  # noqa: E501
         else:
             (data) = self.get_object_ids_with_http_info(permname, username, **kwargs)  # noqa: E501
@@ -261,11 +261,11 @@ class PermissionApi(object):
         """Gets the object ids for which the user has the given permission  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_object_ids_with_http_info(permname, username, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_object_ids_with_http_info(permname, username, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str permname: (required)
         :param str username: (required)
         :return: list[object]
@@ -274,7 +274,7 @@ class PermissionApi(object):
         """
 
         all_params = ['permname', 'username']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -334,42 +334,42 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='list[object]',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
             collection_formats=collection_formats)
 
     def get_permission_from_id(self, id, **kwargs):  # noqa: E501
-        """Gets a permission&#39;s name from its integer ID  # noqa: E501
+        """Gets a permission's name from its integer ID  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_permission_from_id(id, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_permission_from_id(id, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param int id: (required)
         :return: str
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_permission_from_id_with_http_info(id, **kwargs)  # noqa: E501
         else:
             (data) = self.get_permission_from_id_with_http_info(id, **kwargs)  # noqa: E501
             return data
 
     def get_permission_from_id_with_http_info(self, id, **kwargs):  # noqa: E501
-        """Gets a permission&#39;s name from its integer ID  # noqa: E501
+        """Gets a permission's name from its integer ID  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_permission_from_id_with_http_info(id, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_permission_from_id_with_http_info(id, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param int id: (required)
         :return: str
                  If the method is called asynchronously,
@@ -377,7 +377,7 @@ class PermissionApi(object):
         """
 
         all_params = ['id']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -431,42 +431,42 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='str',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
             collection_formats=collection_formats)
 
     def get_permission_id(self, name, **kwargs):  # noqa: E501
-        """Gets a permission&#39;s ID from its name  # noqa: E501
+        """Gets a permission's ID from its name  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_permission_id(name, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_permission_id(name, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str name: (required)
         :return: int
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_permission_id_with_http_info(name, **kwargs)  # noqa: E501
         else:
             (data) = self.get_permission_id_with_http_info(name, **kwargs)  # noqa: E501
             return data
 
     def get_permission_id_with_http_info(self, name, **kwargs):  # noqa: E501
-        """Gets a permission&#39;s ID from its name  # noqa: E501
+        """Gets a permission's ID from its name  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_permission_id_with_http_info(name, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_permission_id_with_http_info(name, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str name: (required)
         :return: int
                  If the method is called asynchronously,
@@ -474,7 +474,7 @@ class PermissionApi(object):
         """
 
         all_params = ['name']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -528,21 +528,21 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='int',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
             collection_formats=collection_formats)
 
     def get_user_permissions_on(self, object, username, **kwargs):  # noqa: E501
-        """Gets the user&#39;s permissions on an object  # noqa: E501
+        """Gets the user's permissions on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_user_permissions_on(object, username, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_user_permissions_on(object, username, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :return: list[object]
@@ -550,21 +550,21 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_user_permissions_on_with_http_info(object, username, **kwargs)  # noqa: E501
         else:
             (data) = self.get_user_permissions_on_with_http_info(object, username, **kwargs)  # noqa: E501
             return data
 
     def get_user_permissions_on_with_http_info(self, object, username, **kwargs):  # noqa: E501
-        """Gets the user&#39;s permissions on an object  # noqa: E501
+        """Gets the user's permissions on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_user_permissions_on_with_http_info(object, username, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_user_permissions_on_with_http_info(object, username, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :return: list[object]
@@ -573,7 +573,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'username']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -633,7 +633,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='list[object]',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -643,11 +643,11 @@ class PermissionApi(object):
         """Grants a group a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.grant_group_permission_on(object, group_name, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.grant_group_permission_on(object, group_name, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :param str permname: (required)
@@ -656,7 +656,7 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.grant_group_permission_on_with_http_info(object, group_name, permname, **kwargs)  # noqa: E501
         else:
             (data) = self.grant_group_permission_on_with_http_info(object, group_name, permname, **kwargs)  # noqa: E501
@@ -666,11 +666,11 @@ class PermissionApi(object):
         """Grants a group a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.grant_group_permission_on_with_http_info(object, group_name, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.grant_group_permission_on_with_http_info(object, group_name, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :param str permname: (required)
@@ -680,7 +680,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'group_name', 'permname']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -746,7 +746,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='bool',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -756,11 +756,11 @@ class PermissionApi(object):
         """Grants a user a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.grant_user_permission_on(object, username, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.grant_user_permission_on(object, username, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :param str permname: (required)
@@ -769,7 +769,7 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.grant_user_permission_on_with_http_info(object, username, permname, **kwargs)  # noqa: E501
         else:
             (data) = self.grant_user_permission_on_with_http_info(object, username, permname, **kwargs)  # noqa: E501
@@ -779,11 +779,11 @@ class PermissionApi(object):
         """Grants a user a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.grant_user_permission_on_with_http_info(object, username, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.grant_user_permission_on_with_http_info(object, username, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :param str permname: (required)
@@ -793,7 +793,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'username', 'permname']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -859,7 +859,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='bool',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -869,11 +869,11 @@ class PermissionApi(object):
         """Revokes a group a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.revoke_group_permission_on(object, group_name, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.revoke_group_permission_on(object, group_name, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :param str permname: (required)
@@ -882,7 +882,7 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.revoke_group_permission_on_with_http_info(object, group_name, permname, **kwargs)  # noqa: E501
         else:
             (data) = self.revoke_group_permission_on_with_http_info(object, group_name, permname, **kwargs)  # noqa: E501
@@ -892,11 +892,11 @@ class PermissionApi(object):
         """Revokes a group a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.revoke_group_permission_on_with_http_info(object, group_name, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.revoke_group_permission_on_with_http_info(object, group_name, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str group_name: (required)
         :param str permname: (required)
@@ -906,7 +906,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'group_name', 'permname']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -972,7 +972,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='bool',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -982,11 +982,11 @@ class PermissionApi(object):
         """Revokes a user a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.revoke_user_permission_on(object, username, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.revoke_user_permission_on(object, username, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :param str permname: (required)
@@ -995,7 +995,7 @@ class PermissionApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.revoke_user_permission_on_with_http_info(object, username, permname, **kwargs)  # noqa: E501
         else:
             (data) = self.revoke_user_permission_on_with_http_info(object, username, permname, **kwargs)  # noqa: E501
@@ -1005,11 +1005,11 @@ class PermissionApi(object):
         """Revokes a user a permission on an object  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.revoke_user_permission_on_with_http_info(object, username, permname, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.revoke_user_permission_on_with_http_info(object, username, permname, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str object: (required)
         :param str username: (required)
         :param str permname: (required)
@@ -1019,7 +1019,7 @@ class PermissionApi(object):
         """
 
         all_params = ['object', 'username', 'permname']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -1085,7 +1085,7 @@ class PermissionApi(object):
             files=local_var_files,
             response_type='bool',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),

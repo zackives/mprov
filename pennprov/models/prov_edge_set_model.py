@@ -92,6 +92,9 @@ class ProvEdgeSetModel(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(ProvEdgeSetModel, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

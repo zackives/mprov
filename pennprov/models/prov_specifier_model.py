@@ -61,6 +61,9 @@ class ProvSpecifierModel(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(ProvSpecifierModel, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

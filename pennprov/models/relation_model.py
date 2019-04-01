@@ -321,6 +321,9 @@ class RelationModel(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(RelationModel, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

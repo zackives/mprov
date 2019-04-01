@@ -89,6 +89,9 @@ class GroupDetails(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(GroupDetails, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

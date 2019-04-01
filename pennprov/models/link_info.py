@@ -141,6 +141,9 @@ class LinkInfo(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(LinkInfo, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

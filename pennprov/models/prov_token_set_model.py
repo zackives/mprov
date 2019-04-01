@@ -92,6 +92,9 @@ class ProvTokenSetModel(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(ProvTokenSetModel, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

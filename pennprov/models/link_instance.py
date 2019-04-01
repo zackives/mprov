@@ -169,6 +169,9 @@ class LinkInstance(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(LinkInstance, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

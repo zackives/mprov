@@ -91,6 +91,9 @@ class RankInstance(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(RankInstance, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

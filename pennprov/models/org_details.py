@@ -61,6 +61,9 @@ class OrgDetails(object):
                 ))
             else:
                 result[attr] = value
+        if issubclass(OrgDetails, dict):
+            for key, value in self.items():
+                result[key] = value
 
         return result
 

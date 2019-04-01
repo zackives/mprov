@@ -34,35 +34,35 @@ class ProvenanceApi(object):
         self.api_client = api_client
 
     def create_or_reset_provenance_graph(self, resource, **kwargs):  # noqa: E501
-        """Create a provenance graph if it doesn&#39;t exist, or overwrite it if it does  # noqa: E501
+        """Create a provenance graph if it doesn't exist, or overwrite it if it does  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.create_or_reset_provenance_graph(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.create_or_reset_provenance_graph(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: None
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.create_or_reset_provenance_graph_with_http_info(resource, **kwargs)  # noqa: E501
         else:
             (data) = self.create_or_reset_provenance_graph_with_http_info(resource, **kwargs)  # noqa: E501
             return data
 
     def create_or_reset_provenance_graph_with_http_info(self, resource, **kwargs):  # noqa: E501
-        """Create a provenance graph if it doesn&#39;t exist, or overwrite it if it does  # noqa: E501
+        """Create a provenance graph if it doesn't exist, or overwrite it if it does  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.create_or_reset_provenance_graph_with_http_info(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.create_or_reset_provenance_graph_with_http_info(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: None
                  If the method is called asynchronously,
@@ -70,7 +70,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -124,7 +124,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -134,18 +134,18 @@ class ProvenanceApi(object):
         """Create a provenance graph  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.create_provenance_graph(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.create_provenance_graph(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: None
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.create_provenance_graph_with_http_info(resource, **kwargs)  # noqa: E501
         else:
             (data) = self.create_provenance_graph_with_http_info(resource, **kwargs)  # noqa: E501
@@ -155,11 +155,11 @@ class ProvenanceApi(object):
         """Create a provenance graph  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.create_provenance_graph_with_http_info(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.create_provenance_graph_with_http_info(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: None
                  If the method is called asynchronously,
@@ -167,7 +167,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -221,7 +221,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -231,11 +231,11 @@ class ProvenanceApi(object):
         """Get the outgoing neighbors of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_connected_from(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_connected_from(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param str label:
@@ -244,7 +244,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_connected_from_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_connected_from_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -254,11 +254,11 @@ class ProvenanceApi(object):
         """Get the outgoing neighbors of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_connected_from_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_connected_from_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param str label:
@@ -268,7 +268,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token', 'label']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -330,7 +330,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvTokenSetModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -340,11 +340,11 @@ class ProvenanceApi(object):
         """Get the incoming neighbors of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_connected_to(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_connected_to(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param str label:
@@ -353,7 +353,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_connected_to_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_connected_to_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -363,11 +363,11 @@ class ProvenanceApi(object):
         """Get the incoming neighbors of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_connected_to_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_connected_to_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param str label:
@@ -377,7 +377,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token', 'label']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -439,7 +439,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvTokenSetModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -449,11 +449,11 @@ class ProvenanceApi(object):
         """Get the outgoing edges of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_edges_from(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_edges_from(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvEdgeSetModel
@@ -461,7 +461,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_edges_from_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_edges_from_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -471,11 +471,11 @@ class ProvenanceApi(object):
         """Get the outgoing edges of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_edges_from_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_edges_from_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvEdgeSetModel
@@ -484,7 +484,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -544,7 +544,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvEdgeSetModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -554,11 +554,11 @@ class ProvenanceApi(object):
         """Get the incoming edges of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_edges_to(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_edges_to(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvEdgeSetModel
@@ -566,7 +566,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_edges_to_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_edges_to_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -576,11 +576,11 @@ class ProvenanceApi(object):
         """Get the incoming edges of the given prov token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_edges_to_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_edges_to_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvEdgeSetModel
@@ -589,7 +589,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -649,7 +649,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvEdgeSetModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -659,11 +659,11 @@ class ProvenanceApi(object):
         """Get the tuple associated with a provenance token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_data(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_data(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: TupleWithSchemaModel
@@ -671,7 +671,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_provenance_data_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_provenance_data_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -681,11 +681,11 @@ class ProvenanceApi(object):
         """Get the tuple associated with a provenance token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_data_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_data_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: TupleWithSchemaModel
@@ -694,7 +694,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -754,7 +754,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='TupleWithSchemaModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -764,11 +764,11 @@ class ProvenanceApi(object):
         """Get the location of a provenance token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_location(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_location(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvSpecifierModel
@@ -776,7 +776,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_provenance_location_with_http_info(resource, token, **kwargs)  # noqa: E501
         else:
             (data) = self.get_provenance_location_with_http_info(resource, token, **kwargs)  # noqa: E501
@@ -786,11 +786,11 @@ class ProvenanceApi(object):
         """Get the location of a provenance token  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_location_with_http_info(resource, token, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_location_with_http_info(resource, token, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :return: ProvSpecifierModel
@@ -799,7 +799,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -859,42 +859,42 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvSpecifierModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
             collection_formats=collection_formats)
 
     def get_provenance_nodes(self, resource, **kwargs):  # noqa: E501
-        """Get the provenance graph&#39;s nodes  # noqa: E501
+        """Get the provenance graph's nodes  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_nodes(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_nodes(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: ProvNodeMapModel
                  If the method is called asynchronously,
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_provenance_nodes_with_http_info(resource, **kwargs)  # noqa: E501
         else:
             (data) = self.get_provenance_nodes_with_http_info(resource, **kwargs)  # noqa: E501
             return data
 
     def get_provenance_nodes_with_http_info(self, resource, **kwargs):  # noqa: E501
-        """Get the provenance graph&#39;s nodes  # noqa: E501
+        """Get the provenance graph's nodes  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_provenance_nodes_with_http_info(resource, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_provenance_nodes_with_http_info(resource, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :return: ProvNodeMapModel
                  If the method is called asynchronously,
@@ -902,7 +902,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -956,7 +956,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='ProvNodeMapModel',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -966,11 +966,11 @@ class ProvenanceApi(object):
         """Get a provenance graph as a sequence of subgraphs  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_subgraphs(resource, body, limit, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_subgraphs(resource, body, limit, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param SubgraphTemplate body: (required)
         :param int limit: (required)
@@ -980,7 +980,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.get_subgraphs_with_http_info(resource, body, limit, **kwargs)  # noqa: E501
         else:
             (data) = self.get_subgraphs_with_http_info(resource, body, limit, **kwargs)  # noqa: E501
@@ -990,11 +990,11 @@ class ProvenanceApi(object):
         """Get a provenance graph as a sequence of subgraphs  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.get_subgraphs_with_http_info(resource, body, limit, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.get_subgraphs_with_http_info(resource, body, limit, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param SubgraphTemplate body: (required)
         :param int limit: (required)
@@ -1005,7 +1005,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'body', 'limit', 'since']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -1073,7 +1073,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type='list[SubgraphInstance]',  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -1083,11 +1083,11 @@ class ProvenanceApi(object):
         """Store a provenance link between tokens  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_provenance_link(resource, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_provenance_link(resource, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param StoreLinkModel body: (required)
         :return: None
@@ -1095,7 +1095,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.store_provenance_link_with_http_info(resource, body, **kwargs)  # noqa: E501
         else:
             (data) = self.store_provenance_link_with_http_info(resource, body, **kwargs)  # noqa: E501
@@ -1105,11 +1105,11 @@ class ProvenanceApi(object):
         """Store a provenance link between tokens  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_provenance_link_with_http_info(resource, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_provenance_link_with_http_info(resource, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param StoreLinkModel body: (required)
         :return: None
@@ -1118,7 +1118,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'body']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -1178,7 +1178,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -1188,11 +1188,11 @@ class ProvenanceApi(object):
         """Store a provenance token with its location  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_provenance_node(resource, token, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_provenance_node(resource, token, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param StoreNodeModel body: (required)
@@ -1201,7 +1201,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.store_provenance_node_with_http_info(resource, token, body, **kwargs)  # noqa: E501
         else:
             (data) = self.store_provenance_node_with_http_info(resource, token, body, **kwargs)  # noqa: E501
@@ -1211,11 +1211,11 @@ class ProvenanceApi(object):
         """Store a provenance token with its location  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_provenance_node_with_http_info(resource, token, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_provenance_node_with_http_info(resource, token, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param str token: (required)
         :param StoreNodeModel body: (required)
@@ -1225,7 +1225,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'token', 'body']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -1291,7 +1291,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
@@ -1301,11 +1301,11 @@ class ProvenanceApi(object):
         """Store a subgraph to a provenance graph  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_subgraph(resource, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_subgraph(resource, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param SubgraphInstance body: (required)
         :return: None
@@ -1313,7 +1313,7 @@ class ProvenanceApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        if kwargs.get('async'):
+        if kwargs.get('async_req'):
             return self.store_subgraph_with_http_info(resource, body, **kwargs)  # noqa: E501
         else:
             (data) = self.store_subgraph_with_http_info(resource, body, **kwargs)  # noqa: E501
@@ -1323,11 +1323,11 @@ class ProvenanceApi(object):
         """Store a subgraph to a provenance graph  # noqa: E501
 
         This method makes a synchronous HTTP request by default. To make an
-        asynchronous HTTP request, please pass async=True
-        >>> thread = api.store_subgraph_with_http_info(resource, body, async=True)
+        asynchronous HTTP request, please pass async_req=True
+        >>> thread = api.store_subgraph_with_http_info(resource, body, async_req=True)
         >>> result = thread.get()
 
-        :param async bool
+        :param async_req bool
         :param str resource: (required)
         :param SubgraphInstance body: (required)
         :return: None
@@ -1336,7 +1336,7 @@ class ProvenanceApi(object):
         """
 
         all_params = ['resource', 'body']  # noqa: E501
-        all_params.append('async')
+        all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
         all_params.append('_request_timeout')
@@ -1396,7 +1396,7 @@ class ProvenanceApi(object):
             files=local_var_files,
             response_type=None,  # noqa: E501
             auth_settings=auth_settings,
-            async=params.get('async'),
+            async_req=params.get('async_req'),
             _return_http_data_only=params.get('_return_http_data_only'),
             _preload_content=params.get('_preload_content', True),
             _request_timeout=params.get('_request_timeout'),
