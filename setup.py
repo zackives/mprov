@@ -35,7 +35,7 @@ setup(
     version=VERSION,
     description="Habitat repository and authorization API",
     author_email="zives@seas.upenn.edu",
-    url="https://bitbucket.org/penndb/hab-python-client",
+    url="https://bitbucket.org/penndb/pennprov",
     keywords=["Swagger", "Habitat repository and authorization API"],
     install_requires=REQUIRES,
     packages=find_packages(),
