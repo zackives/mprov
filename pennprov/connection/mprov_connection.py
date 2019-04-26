@@ -16,7 +16,8 @@ class MProvConnection:
     namespace = 'http://mprov.md2k.org'
     graph_name = "mProv-graph"
 
-    def __init__(self, user:str, password: str, host: str):
+    def __init__(self, user, password, host):
+        # type: (str, str, str) -> None
         """
         Establish a connection to a PennProvenance server
         :param user: User ID
@@ -75,26 +76,31 @@ class MProvConnection:
         return self.username
 
     # Create a unique ID for an operator stream window
-    def get_window_id(self, stream_operator: str, id):
+    def get_window_id(self, stream_operator, id):
+        # type: (str, Any) -> str
         return stream_operator.join('_w.').join(str(id))
 
     # Create a unique ID for a stream operator result
-    def get_result_id(self, stream: str, id):
+    def get_result_id(self, stream, id):
+        # type: (str, Any) -> str
         return stream.join('._r').join(id)
 
     # Create a unique ID for an entity
-    def get_entity_id(self, stream: str, id: object) -> str:
+    def get_entity_id(self, stream, id):
+        # type: (str, Any) -> str
         return stream + '._e' + str(id)
 
     # Create a unique ID for an activity (a stream operator call)
-    def get_activity_id(self, operator: str, id: object) -> str:
+    def get_activity_id(self, operator, id):
+        # type: (str, Any) -> str
         return operator + '._e' + str(id)
 
     def store_activity(self,
-                       activity: str,
-                       start: int,
-                       end: int,
-                       location: int):
+                       activity,
+                       start,
+                       end,
+                       location):
+        # type: (str, int, int, int) -> None
         """
         Create an entity node for an activity (a stream operator computation)
 
@@ -110,7 +116,9 @@ class MProvConnection:
                                     token=self.get_activity_id(activity, location), body=activity)
         return
 
-    def store_stream_tuple(self, stream_name: str, stream_index: int, input_tuple: BasicTuple):
+    def store_stream_tuple(self, stream_name, stream_index, input_tuple):
+        # type: (str, int, BasicTuple) -> pennprov.QualifiedName
+
         """
         Create an entity node for a stream tuple
 
@@ -144,10 +152,11 @@ class MProvConnection:
         return token
 
     def store_annotation(self,
-                         stream_name: str,
-                         stream_index: int,
-                         annotation_name: str,
+                         stream_name,
+                         stream_index,
+                         annotation_name,
                          annotation_value):
+        # type: (str, int, str, Any) -> pennprov.QualifiedName 
         """
         Create a node for an annotation to an entity / tuple
 
@@ -182,10 +191,11 @@ class MProvConnection:
         return ann_token
 
     def store_window_and_inputs(self,
-                                output_stream_name: str,
-                                output_stream_index: int,
-                                input_tokens_list: list
+                                output_stream_name,
+                                output_stream_index,
+                                input_tokens_list
                                 ):
+        # type: (str, int, list) -> pennprov.QualifiedName
         """
         Store a mapping between an operator window, from
         which a stream is to be derived, and the input
@@ -216,14 +226,15 @@ class MProvConnection:
         return window_token
     
     def store_windowed_result(self,
-                                output_stream_name: str,
-                                output_stream_index: int,
-                                output_tuple: BasicTuple,
-                                input_tokens_list: list,
-                                activity: str,
-                                start: int,
-                                end: int
+                                output_stream_name,
+                                output_stream_index,
+                                output_tuple,
+                                input_tokens_list,
+                                activity,
+                                start,
+                                end
                                 ):
+        # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
         """
         When we have a windowed computation, this creates a complex derivation subgraph
         in one operation.

@@ -13,10 +13,12 @@ class BasicSchema:
         else:
             raise TypeError('Illegal inputs')
 
-    def init1(self, name: str):
+    def init1(self, name):
+        # type: (str) -> None
         self.name = name
 
-    def init2(self, name: str, fields_types: dict):
+    def init2(self, name, fields_types):
+        # type: (str, dict) -> None
         """ Initialize with a name and a dictionary of attributes to types """
         self.name = name
         self.fields = []
@@ -25,17 +27,20 @@ class BasicSchema:
             self.fields.append(k)
             self.types.append(fields_types[k])
 
-    def init3(self, name: str, fields: list, types: list):
+    def init3(self, name, fields, types):
+        # type: (str, list, list) -> None
         """ Initialize with a name and a list of field-type pairs """
         self.name = name
         self.fields = fields
         self.values = types
 
-    def add_field(self, k: str, v):
+    def add_field(self, k, v):
+        # type: (str, Any) -> None
         self.fields.append(k)
         self.types.append(v)
 
-    def get_field(self, k: str):
+    def get_field(self, k):
+        # type: (str) -> Any
         i = self.fields.index(k)
         if i:
             return self.types[i]
@@ -56,10 +61,12 @@ class BasicSchema:
     def create_tuple_blank(self):
         return BasicTuple(self)
 
-    def create_tuple_dict(self, content: dict):
+    def create_tuple_dict(self, content):
+        # type: (dict) -> BasicTuple
         return BasicTuple(self, dict)
 
-    def create_tuple_list(self, content: list):
+    def create_tuple_list(self, content):
+        # type (list) -> BasicTuple
         dict2 = {}
         for i, k in enumerate(self.fields):
             dict2[k] = content[i]
@@ -87,12 +94,14 @@ class BasicTuple:
         else:
             raise TypeError('Illegal inputs')
 
-    def init1(self, schema: BasicSchema):
+    def init1(self, schema):
+        # type: (BasicSchema) -> None
         self.schema = schema
         for i, name in enumerate(schema.fields):
             self.data[name] = None
 
-    def init2(self, schema: BasicSchema, values: dict):
+    def init2(self, schema, values):
+        # type: (BasicSchema, dict) -> None
         self.schema = schema
         self.data = values
 
