@@ -17,6 +17,7 @@ Method | HTTP request | Description
 [**store_provenance_link**](ProvenanceApi.md#store_provenance_link) | **POST** /provenance/graphs/{resource}/links | Store a provenance link between tokens
 [**store_provenance_node**](ProvenanceApi.md#store_provenance_node) | **PUT** /provenance/graphs/{resource}/nodes/{token} | Store a provenance token with its location
 [**store_subgraph**](ProvenanceApi.md#store_subgraph) | **POST** /provenance/graphs/{resource}/subgraphs/store | Store a subgraph to a provenance graph
+[**store_subgraph_template**](ProvenanceApi.md#store_subgraph_template) | **POST** /provenance/graphs/{resource}/subgraphs/template | Store a subgraph template for a provenance graph
 
 
 # **create_or_reset_provenance_graph**
@@ -704,6 +705,59 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **resource** | **str**|  | 
  **body** | [**SubgraphInstance**](SubgraphInstance.md)|  | 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[jwt](../README.md#jwt)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **store_subgraph_template**
+> store_subgraph_template(resource, body)
+
+Store a subgraph template for a provenance graph
+
+### Example
+```python
+from __future__ import print_function
+import time
+import pennprov
+from pennprov.rest import ApiException
+from pprint import pprint
+
+# Configure API key authorization: jwt
+configuration = pennprov.Configuration()
+configuration.api_key['api_key'] = 'YOUR_API_KEY'
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['api_key'] = 'Bearer'
+
+# create an instance of the API class
+api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
+resource = 'resource_example' # str | 
+body = pennprov.SubgraphTemplate() # SubgraphTemplate | 
+
+try:
+    # Store a subgraph template for a provenance graph
+    api_instance.store_subgraph_template(resource, body)
+except ApiException as e:
+    print("Exception when calling ProvenanceApi->store_subgraph_template: %s\n" % e)
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **resource** | **str**|  | 
+ **body** | [**SubgraphTemplate**](SubgraphTemplate.md)|  | 
 
 ### Return type
 
