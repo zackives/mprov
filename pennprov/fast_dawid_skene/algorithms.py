@@ -117,7 +117,7 @@ def run(responses, args, tol=0.0001, CM_tol=0.005, max_iter=100):
         # total_time += end-start
 
         # check likelihood
-        log_L = calc_likelihood(counts, class_marginals, error_rates)
+        log_L = calc_likelihood(counts, class_marginals, error_rates, args)
 
         # check for convergence
         if old_class_marginals is not None:
@@ -334,7 +334,7 @@ def e_step(counts, class_marginals, error_rates, mode):
         return final_classes
 
 
-def calc_likelihood(counts, class_marginals, error_rates):
+def calc_likelihood(counts, class_marginals, error_rates, args):
     """
     Calculate the likelihood with the current  parameters
 
@@ -369,8 +369,8 @@ def calc_likelihood(counts, class_marginals, error_rates):
         temp = log_L + np.log(patient_likelihood)
 
         if np.isnan(temp) or np.isinf(temp):
-            # if args.verbose:
-            #     print(i, log_L, np.log(patient_likelihood), temp)
+            if args.verbose:
+                 print(i, log_L, np.log(patient_likelihood), temp)
             sys.exit()
 
         log_L = temp

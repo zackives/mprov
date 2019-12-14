@@ -3,6 +3,7 @@ from pennprov.trust.typehandlers import SetItem
 
 
 def majority_vote(votes: Dict[int, Set[SetItem]]) -> Dict[int,bool]:
+    # type: (Dict[int, Set[SetItem]]) -> Dict[int,bool]
     """
     Given a dictionary of agent -> votes, figure out
     for each set item whether the majority vote positively or
@@ -21,7 +22,8 @@ def majority_vote(votes: Dict[int, Set[SetItem]]) -> Dict[int,bool]:
     return [x >= threshold for x in votes]
 
 
-def unanimous_vote(votes: Dict[int, Set[SetItem]]) -> Dict[int,bool]:
+def unanimous_vote(votes):
+    # type: (Dict[int, Set[SetItem]]) -> Dict[int,bool]
     """
     Given a dictionary of agent -> votes, figure out
     for each set item whether all vote positively
@@ -39,7 +41,8 @@ def unanimous_vote(votes: Dict[int, Set[SetItem]]) -> Dict[int,bool]:
     return [x >= threshold for x in votes]
 
 
-def precision_vs_gold(choice: Set[SetItem], gold: Set[SetItem]) -> float:
+def precision_vs_gold(choice, gold):
+    # type: (Set[SetItem], Set[SetItem]) -> float
     tp = 0
 
     for item in choice:
@@ -48,7 +51,8 @@ def precision_vs_gold(choice: Set[SetItem], gold: Set[SetItem]) -> float:
     return float(tp) / len(choice)
 
 
-def recall_vs_gold(choice: Set[SetItem], gold: Set[SetItem]) -> float:
+def recall_vs_gold(choice, gold):
+    # type: (Set[SetItem], Set[SetItem]) -> float
     tp = 0
 
     for item in gold:
@@ -57,7 +61,8 @@ def recall_vs_gold(choice: Set[SetItem], gold: Set[SetItem]) -> float:
     return float(tp) / len(gold)
 
 
-def jaccard(a: Set[SetItem], b: Set[SetItem]) -> float:
+def jaccard(a, b):
+    # type: (Set[SetItem], Set[SetItem]) -> float
     return float(len(a.intersection(b))) / len(a.union(b))
 
 

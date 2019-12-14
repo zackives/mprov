@@ -1,9 +1,0 @@
-Credits
-
-This code is from https://github.com/sukrutrao/Fast-Dawid-Skene, with the main web site at:
-https://sites.google.com/view/fast-dawid-skene
-
-And accompanies the paper:
- Vaibhav B Sinha, Sukrut Rao, Vineeth N Balasubramanian. Fast Dawid-Skene: A Fast Vote Aggregation Scheme for Sentiment Classification. KDD WISDOM 2018
-
-It is MIT-licensed.

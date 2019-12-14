@@ -51,7 +51,8 @@ class DomainToSet:
     Convert from a given domain to a set of discrete values
     that we can reason about
     """
-    def get_set(self, items: list) -> Set[SetItem]:
+    def get_set(self, items):
+        # type: (List) -> Set[SetItem]
         """
         Takes the set of items representing composite data,
         and returns a list of discrete and comparable items
@@ -71,13 +72,16 @@ class TimeSeriesToSet(DomainToSet):
     tend = lambda x: x['end']
     sample_rate = 1
 
-    def __init__(self, sample_rate, tstart_getter: Callable, \
-                 tend_getter: Callable):
-        self.tstart = tstart_getter
-        self.tend = tend_getter
+    def __init__(self, sample_rate, tstart_getter = None, tend_getter = None):
+        # type: (int, Callable, Callable)
+        if tstart_getter:
+            self.tstart = tstart_getter
+        if tend_getter:
+            self.tend = tend_getter
         self.sample_rate = sample_rate
 
-    def get_set(self, items: list) -> Set[SetItem]:
+    def get_set(self, items):
+        # type: (List) -> Set[SetItem]
         ret = set([])
 
         for item in items:
@@ -92,7 +96,8 @@ class DiscreteItemToSet(DomainToSet):
     into a set of SetItems
     """
 
-    def get_set(self, items: list) -> Set[SetItem]:
+    def get_set(self, items):
+        # type: (List) -> Set[SetItem]
         ret = set([])
 
         for item in items:
