@@ -1,7 +1,8 @@
-from typing import Set, Callable, Dict, List, Any, Tuple
+from typing import Set, Dict, List, Tuple
 from types import SimpleNamespace
 from pennprov.trust.typehandlers import SetItem
-from pennprov.fast_dawid_skene import algorithms
+from pennprov.trust.fast_dawid_skene import algorithms
+
 
 class GetAgentTrust:
     item_to_agent = lambda x: x['agent']
