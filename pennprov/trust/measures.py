@@ -58,6 +58,6 @@ def recall_vs_gold(choice: Set[SetItem], gold: Set[SetItem]) -> float:
 
 
 def jaccard(a: Set[SetItem], b: Set[SetItem]) -> float:
-    return float(a.intersection(b)) / a.union(b)
+    return float(len(a.intersection(b))) / len(a.union(b))
 
 

@@ -17,6 +17,12 @@ class SetItem:
         self.item = item
         self.original = orig
 
+    def __str__(self):
+        return str(self.item)
+
+    def __repr__(self):
+        return str(self.item)
+
     def get_id(self) -> int:
         if self.item:
             return hash(self.item)
@@ -30,7 +36,10 @@ class SetItem:
         return self.original
 
     def __eq__(self, other):
-        return self.get_id() == other.get_id()
+        if isinstance(other,SetItem):
+            return self.get_id() == other.get_id()
+        else:
+            return self.get_id() == other
 
     def __hash__(self):
         return hash(self.get_id())
