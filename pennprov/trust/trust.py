@@ -31,7 +31,7 @@ class CoreTrust(GetAgentTrust):
                 if agent not in responses[item]:
                     responses[item][agent] = [False]
 
-        d = {'algorithm': arg, 'verbose': 'True'}
+        d = {'algorithm': arg, 'verbose': 'False'}
         args = SimpleNamespace(**d)
         print (responses)
         results = algorithms.run(responses, args)
