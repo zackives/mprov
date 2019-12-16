@@ -13,6 +13,7 @@ Method | HTTP request | Description
 [**get_provenance_data**](ProvenanceApi.md#get_provenance_data) | **GET** /provenance/graphs/{resource}/nodes/{token} | Get the tuple associated with a provenance token
 [**get_provenance_location**](ProvenanceApi.md#get_provenance_location) | **GET** /provenance/graphs/{resource}/nodes/{token}/location | Get the location of a provenance token
 [**get_provenance_nodes**](ProvenanceApi.md#get_provenance_nodes) | **GET** /provenance/graphs/{resource}/nodes | Get the provenance graph&#39;s nodes
+[**get_subgraph_template**](ProvenanceApi.md#get_subgraph_template) | **GET** /provenance/graphs/{resource}/subgraphs/template | Get the subgraph template of a provenance graph
 [**get_subgraphs**](ProvenanceApi.md#get_subgraphs) | **POST** /provenance/graphs/{resource}/subgraphs | Get a provenance graph as a sequence of subgraphs
 [**store_provenance_link**](ProvenanceApi.md#store_provenance_link) | **POST** /provenance/graphs/{resource}/links | Store a provenance link between tokens
 [**store_provenance_node**](ProvenanceApi.md#store_provenance_node) | **PUT** /provenance/graphs/{resource}/nodes/{token} | Store a provenance token with its location
@@ -490,6 +491,58 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**ProvNodeMapModel**](ProvNodeMapModel.md)
+
+### Authorization
+
+[jwt](../README.md#jwt)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **get_subgraph_template**
+> SubgraphTemplate get_subgraph_template(resource)
+
+Get the subgraph template of a provenance graph
+
+### Example
+```python
+from __future__ import print_function
+import time
+import pennprov
+from pennprov.rest import ApiException
+from pprint import pprint
+
+# Configure API key authorization: jwt
+configuration = pennprov.Configuration()
+configuration.api_key['api_key'] = 'YOUR_API_KEY'
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['api_key'] = 'Bearer'
+
+# create an instance of the API class
+api_instance = pennprov.ProvenanceApi(pennprov.ApiClient(configuration))
+resource = 'resource_example' # str | 
+
+try:
+    # Get the subgraph template of a provenance graph
+    api_response = api_instance.get_subgraph_template(resource)
+    pprint(api_response)
+except ApiException as e:
+    print("Exception when calling ProvenanceApi->get_subgraph_template: %s\n" % e)
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **resource** | **str**|  | 
+
+### Return type
+
+[**SubgraphTemplate**](SubgraphTemplate.md)
 
 ### Authorization
 
