@@ -17,7 +17,7 @@ from pennprov.trust.typehandlers import SetItem
 from pennprov.trust.fast_dawid_skene import algorithms
 
 
-class GetAgentTrust:
+class GetItemTrust:
     item_to_agent = lambda x: x['agent']
 
     def get_trust(self, discrete_items, gold_standard = None):
@@ -25,12 +25,12 @@ class GetAgentTrust:
         return []
 
 
-class CoreTrust(GetAgentTrust):
+class CoreTrust(GetItemTrust):
     """
     Trust model, core algorithm
     """
 
-    def get_trust_core(self, discrete_items, arg, gold_standard = None):
+    def get_trust_core(self, discrete_items, arg):
         # type: (Dict[int, str, Set[SetItem], int]) -> Tuple[List,List]
 
         responses = {}
@@ -44,9 +44,9 @@ class CoreTrust(GetAgentTrust):
                 if agent not in responses[item]:
                     responses[item][agent] = [False]
 
-        d = {'algorithm': arg, 'verbose': 'False'}
+        d = {'algorithm': arg, 'verbose': False}
         args = SimpleNamespace(**d)
-        print (responses)
+        #print (responses)
         results = algorithms.run(responses, args)
 
         questions = responses.keys()
@@ -57,24 +57,63 @@ class CoreTrust(GetAgentTrust):
 
 
 class FastDawidSkeneTrust(CoreTrust):
-    def get_trust(self, discrete_items, gold_standard = None):
+    def get_trust(self, discrete_items):
         # type: (Dict[int, str, Set[SetItem], int]) -> Tuple[List,List]
-        return super().get_trust_core(discrete_items, 'FDS', gold_standard)
+        return super().get_trust_core(discrete_items, 'FDS')
 
 
 class DawidSkeneTrust(CoreTrust):
-    def get_trust(self, discrete_items, gold_standard = None):
+    def get_trust(self, discrete_items):
         # type: (Dict[int, str, Set[SetItem], int]) -> Tuple[List,List]
-        return super().get_trust_core(discrete_items, 'DS', gold_standard)
+        return super().get_trust_core(discrete_items, 'DS')
 
 
 class MajorityVoteTrust(CoreTrust):
-    def get_trust(self, discrete_items, gold_standard = None):
+    def get_trust(self, discrete_items):
         # type: (Dict[int, str, Set[SetItem], int]) -> Tuple[List,List]
-        return super().get_trust_core(discrete_items, 'MV', gold_standard)
+        return super().get_trust_core(discrete_items, 'MV')
 
 
 class HybridDawidSkeneTrust(CoreTrust):
-    def get_trust(self, discrete_items, gold_standard = None):
+    def get_trust(self, discrete_items):
         # type: (Dict[int, str, Set[SetItem], int]) -> Tuple[List,List]
-        return super().get_trust_core(discrete_items, 'H', gold_standard)
+        return super().get_trust_core(discrete_items, 'H')
+
+class AgentTrust:
+    @staticmethod
+    def get_confusion(agent_items, gold_items, opt_tn=None):
+        fp = 0
+        tp = 0
+        fn = 0
+        tn = 0
+        if opt_tn:
+            tn = opt_tn
+        for item in agent_items:
+            if item in gold_items:
+                tp = tp + 1
+            else:
+                fp = fp + 1
+        for item in gold_items:
+            if item in agent_items:
+                fn = fn + 1
+        return tp, fp, tn, fn
+
+    @staticmethod
+    def get_agent_precision(agent_items, gold_items, opt_tn=None):
+        tp, fp, tn, fn = AgentTrust.get_confusion(agent_items, gold_items)
+        precision = tp / (tp + fp)
+        return precision
+
+    @staticmethod
+    def get_agent_recall(agent_items, gold_items, opt_tn=None):
+        tp, fp, tn, fn = AgentTrust.get_confusion(agent_items, gold_items)
+        recall = tp / (tp + fn)
+        return recall
+
+    @staticmethod
+    def get_agent_f1(agent_items, gold_items, opt_tn=None):
+        tp, fp, tn, fn = AgentTrust.get_confusion(agent_items, gold_items)
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        f1 = 2 * (precision * recall) / (precision + recall)
+        return f1

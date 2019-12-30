@@ -13,7 +13,6 @@
 
 from typing import Set, Callable, Dict, List, Any
 
-
 class SetItem:
     """
     Basic abstraction for a discrete item in a data range.
@@ -75,6 +74,24 @@ class DomainToSet:
         """
         return set([])
 
+class RegionToSet(DomainToSet):
+    """
+    Converts annotated 2D regions/rectangles to a series of discrete (x,y) elements.
+    Assumes items are in an (x1,y1,x2,y2) form.
+    """
+    def get_set(self, items):
+        # type: (List[Tuple]) -> Set[SetItem]
+        ret = set([])
+
+        for item in items:
+            xmin = min(item[0], item[2])
+            xmax = max(item[0], item[2])
+            ymin = min(item[1], item[3])
+            ymax = min(item[1], item[3])
+            for x in range(xmin, xmax+1):
+                for y in range(ymin, ymax+1):
+                    ret.add(SetItem((x,y), item))
+        return ret
 
 class TimeSeriesToSet(DomainToSet):
     """

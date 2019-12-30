@@ -108,6 +108,7 @@ class TimeSeriesTestCase(unittest.TestCase):
         print ('** Trust algorithm: %s **'%fdst)
         conv = TimeSeriesToSet(1, lambda x: x['start'],
                                lambda x: x['end'])
+
         votes_enumerated = {}
         for i in self.votes.keys():
             v = self.votes[i]
@@ -118,6 +119,11 @@ class TimeSeriesTestCase(unittest.TestCase):
 
         print ('Trusted:', trusted)
         print ('Untrusted:', untrusted)
+
+        for i in votes_enumerated:
+            print ('>> Trustworthiness by f-measure of Agent %d = %f' %(i,AgentTrust.get_agent_f1(votes_enumerated[i], \
+                                                                                                  trusted)))
+
         return True
 
 
