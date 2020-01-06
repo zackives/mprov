@@ -1,6 +1,20 @@
+"""
+ Copyright 2019 Trustees of the University of Pennsylvania
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ http://www.apache.org/licenses/LICENSE-2.0
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
 from __future__ import print_function
 from pprint import pprint
 
+from typing import List
 import pennprov
 from pennprov.rest import ApiException
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
@@ -224,7 +238,35 @@ class MProvConnection:
             self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='membership')
 
         return window_token
-    
+
+    def get_prov_nodes(self, stream_name):
+        # type: (str) -> Dict[str,BasicTuple]
+        nodes = self.prov_api.get_provenance_nodes(self.get_graph())
+        result = {}
+        for i in nodes:
+            result[i] = nodes[i]['tuple']
+        return result
+
+    def get_prov_edges_from(self, node_id):
+        # type: (str) -> List[str]
+        edges = self.prov_api.get_connected_from(self.get_graph(), node_id)
+        return edges
+
+    def get_prov_edges_to(self, node_id):
+        # type: (str) -> List[str]
+        edges = self.prov_api.get_connected_from(self.get_graph(), node_id)
+        return edges
+
+    def get_prov_labeled_edges_from(self, node_id, label):
+        # type: (str) -> List[str]
+        edges = self.prov_api.get_connected_from(self.get_graph(), node_id, label=label)
+        return edges
+
+    def get_prov_labeled_edges_to(self, node_id, label):
+        # type: (str) -> List[str]
+        edges = self.prov_api.get_connected_from(self.get_graph(), node_id, label=label)
+        return edges
+
     def store_windowed_result(self,
                                 output_stream_name,
                                 output_stream_index,
