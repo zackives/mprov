@@ -33,21 +33,24 @@ class NodeInfo(object):
     swagger_types = {
         'id': 'str',
         'type': 'str',
-        'use_since': 'bool'
+        'use_since': 'bool',
+        'optional': 'bool'
     }
 
     attribute_map = {
         'id': 'id',
         'type': 'type',
-        'use_since': 'useSince'
+        'use_since': 'useSince',
+        'optional': 'optional'
     }
 
-    def __init__(self, id=None, type=None, use_since=None):  # noqa: E501
+    def __init__(self, id=None, type=None, use_since=None, optional=None):  # noqa: E501
         """NodeInfo - a model defined in Swagger"""  # noqa: E501
 
         self._id = None
         self._type = None
         self._use_since = None
+        self._optional = None
         self.discriminator = None
 
         if id is not None:
@@ -56,6 +59,8 @@ class NodeInfo(object):
             self.type = type
         if use_since is not None:
             self.use_since = use_since
+        if optional is not None:
+            self.optional = optional
 
     @property
     def id(self):
@@ -119,6 +124,27 @@ class NodeInfo(object):
         """
 
         self._use_since = use_since
+
+    @property
+    def optional(self):
+        """Gets the optional of this NodeInfo.  # noqa: E501
+
+
+        :return: The optional of this NodeInfo.  # noqa: E501
+        :rtype: bool
+        """
+        return self._optional
+
+    @optional.setter
+    def optional(self, optional):
+        """Sets the optional of this NodeInfo.
+
+
+        :param optional: The optional of this NodeInfo.  # noqa: E501
+        :type: bool
+        """
+
+        self._optional = optional
 
     def to_dict(self):
         """Returns the model properties as a dict"""
