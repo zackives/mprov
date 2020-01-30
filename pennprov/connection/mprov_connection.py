@@ -13,6 +13,7 @@
 from __future__ import print_function
 from pprint import pprint
 
+import logging
 import pennprov
 from pennprov.rest import ApiException
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
@@ -66,7 +67,6 @@ class MProvConnection:
         """
         return self.graph_name
 
-
     def set_graph(self, name):
         """
         Set the name of the graph in the graph store
@@ -90,12 +90,12 @@ class MProvConnection:
     # Create a unique ID for an operator stream window
     def get_window_id(self, stream_operator, id):
         # type: (str, Any) -> str
-        return stream_operator.join('_w.').join(str(id))
+        return stream_operator + '_w.' + str(id)
 
     # Create a unique ID for a stream operator result
     def get_result_id(self, stream, id):
         # type: (str, Any) -> str
-        return stream.join('._r').join(id)
+        return stream + '._r' + str(id)
 
     # Create a unique ID for an entity
     def get_entity_id(self, stream, id):
@@ -122,13 +122,17 @@ class MProvConnection:
         :param location: Index position etc
         :return:
         """
-        tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
-        activity = pennprov.NodeModel(type='ACTIVITY',attributes=[], \
-                                        location=tok, start_time=start, end_time=end)
-        self.prov_dm_api.store_node(resource=self.get_graph(),
-                                    token=tok, body=activity)
+        data = []
 
-        return tok
+        tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
+        token = pennprov.QualifiedName(self.namespace, self.get_activity_id(activity, location))
+        activity = pennprov.NodeModel(type='ACTIVITY', attributes=data, \
+                                      location=tok, start_time=start, end_time=end)
+        self.prov_dm_api.store_node(resource=self.get_graph(),
+                                    token=token, body=activity)
+        logging.debug('Storing ACTIVITY %s' % str(token))
+
+        return token
 
     def store_stream_tuple(self, stream_name, stream_index, input_tuple):
         # type: (str, int, BasicTuple) -> pennprov.QualifiedName
@@ -165,9 +169,9 @@ class MProvConnection:
         # attributes
         entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=token, body=entity_node)
+                                    token=token, body=entity_node)
 
-        print('Storing node ' + str(token))
+        logging.debug('Storing ENTITY ' + str(token))
 
         return token
 
@@ -188,7 +192,6 @@ class MProvConnection:
         :return:
         """
 
-
         # The "token" for the tuple will be the node ID
         token = pennprov.QualifiedName(self.namespace, self.get_entity_id(stream_name, stream_index - 1))
 
@@ -201,7 +204,7 @@ class MProvConnection:
                                type='STRING')]
         entity_node = pennprov.NodeModel(type='ENTITY', attributes=attributes)
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=ann_token, body=entity_node)
+                                    token=ann_token, body=entity_node)
 
         # Then we add a relationship edge (of type ANNOTATED)
         annotates = pennprov.RelationModel(
@@ -229,16 +232,19 @@ class MProvConnection:
 
         # The "token" for the tuple will be the node ID
         if isinstance(output_stream_index, int):
-            window_token = pennprov.QualifiedName(self.namespace, self.get_window_id(output_stream_name, output_stream_index - 1))
+            window_token = pennprov.QualifiedName(self.namespace,
+                                                  self.get_window_id(output_stream_name, output_stream_index - 1))
         else:
             window_token = pennprov.QualifiedName(self.namespace,
                                                   self.get_window_id(output_stream_name, output_stream_index))
 
         # Finally, we build an entity node within the graph, with the token and the
         # attributes
-        entity_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
+        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=window_token, body=entity_node)
+                                    token=window_token, body=coll_node)
+
+        logging.debug('Storing COLLECTION %s' % str(window_token))
 
         for token in input_tokens_list:
             # Add a relationship edge (of type ANNOTATED)
@@ -252,14 +258,14 @@ class MProvConnection:
         return window_token
 
     def store_windowed_result(self,
-                                output_stream_name,
-                                output_stream_index,
-                                output_tuple,
-                                input_tokens_list,
-                                activity,
-                                start,
-                                end
-                                ):
+                              output_stream_name,
+                              output_stream_index,
+                              output_tuple,
+                              input_tokens_list,
+                              activity,
+                              start,
+                              end
+                              ):
         # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
         """
         When we have a windowed computation, this creates a complex derivation subgraph
@@ -289,6 +295,6 @@ class MProvConnection:
 
         generates = pennprov.RelationModel(
             type='GENERATION', subject_id=activity_token, object_id=result_token, attributes=[])
-        self.prov_dm_api.store_relation(resource=self.get_graph(), body=uses, label='generation')
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='generation')
 
         return window_token
