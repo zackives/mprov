@@ -1,5 +1,5 @@
 """
- Copyright 2019 Trustees of the University of Pennsylvania
+ Copyright 2020 Trustees of the University of Pennsylvania
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -10,11 +10,10 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-
 from __future__ import print_function
 from pprint import pprint
 
-from typing import List
+import logging
 import pennprov
 from pennprov.rest import ApiException
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
@@ -68,7 +67,6 @@ class MProvConnection:
         """
         return self.graph_name
 
-
     def set_graph(self, name):
         """
         Set the name of the graph in the graph store
@@ -92,12 +90,12 @@ class MProvConnection:
     # Create a unique ID for an operator stream window
     def get_window_id(self, stream_operator, id):
         # type: (str, Any) -> str
-        return stream_operator.join('_w.').join(str(id))
+        return stream_operator + '_w.' + str(id)
 
     # Create a unique ID for a stream operator result
     def get_result_id(self, stream, id):
         # type: (str, Any) -> str
-        return stream.join('._r').join(id)
+        return stream + '._r' + str(id)
 
     # Create a unique ID for an entity
     def get_entity_id(self, stream, id):
@@ -124,11 +122,17 @@ class MProvConnection:
         :param location: Index position etc
         :return:
         """
-        activity = pennprov.NodeModel(type='ACTIVITY',attributes=[], \
-                                        location=location, start_time=start, end_time=end)
+        data = []
+
+        tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
+        token = pennprov.QualifiedName(self.namespace, self.get_activity_id(activity, location))
+        activity = pennprov.NodeModel(type='ACTIVITY', attributes=data, \
+                                      location=tok, start_time=start, end_time=end)
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                                    token=self.get_activity_id(activity, location), body=activity)
-        return
+                                    token=token, body=activity)
+        logging.debug('Storing ACTIVITY %s' % str(token))
+
+        return token
 
     def store_stream_tuple(self, stream_name, stream_index, input_tuple):
         # type: (str, int, BasicTuple) -> pennprov.QualifiedName
@@ -143,11 +147,17 @@ class MProvConnection:
         """
 
         # The "token" for the tuple will be the node ID
-        token = pennprov.QualifiedName(self.namespace, self.get_entity_id(stream_name, stream_index - 1))
+        if isinstance(stream_index, int):
+            token = pennprov.QualifiedName(self.namespace, self.get_entity_id(stream_name, stream_index - 1))
+        else:
+            token = pennprov.QualifiedName(self.namespace, self.get_entity_id(stream_name, stream_index))
 
         # We also embed the token within the tuple, in case the programmer queries the database
         # and wants to see it
-        input_tuple["_prov"] = self.get_entity_id(stream_name, stream_index - 1)
+        if isinstance(stream_index, int):
+            input_tuple["_prov"] = self.get_entity_id(stream_name, stream_index - 1)
+        else:
+            input_tuple["_prov"] = self.get_entity_id(stream_name, stream_index)
 
         # Now we'll create a tuple within the provenance node, to capture the data
         data = []
@@ -159,9 +169,9 @@ class MProvConnection:
         # attributes
         entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=token, body=entity_node)
+                                    token=token, body=entity_node)
 
-        print('Storing node ' + str(token))
+        logging.debug('Storing ENTITY ' + str(token))
 
         return token
 
@@ -170,7 +180,7 @@ class MProvConnection:
                          stream_index,
                          annotation_name,
                          annotation_value):
-        # type: (str, int, str, Any) -> pennprov.QualifiedName 
+        # type: (str, int, str, Any) -> pennprov.QualifiedName
         """
         Create a node for an annotation to an entity / tuple
 
@@ -181,7 +191,6 @@ class MProvConnection:
         :param annotation_value: The value of the annotation
         :return:
         """
-
 
         # The "token" for the tuple will be the node ID
         token = pennprov.QualifiedName(self.namespace, self.get_entity_id(stream_name, stream_index - 1))
@@ -195,7 +204,7 @@ class MProvConnection:
                                type='STRING')]
         entity_node = pennprov.NodeModel(type='ENTITY', attributes=attributes)
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=ann_token, body=entity_node)
+                                    token=ann_token, body=entity_node)
 
         # Then we add a relationship edge (of type ANNOTATED)
         annotates = pennprov.RelationModel(
@@ -214,20 +223,28 @@ class MProvConnection:
         Store a mapping between an operator window, from
         which a stream is to be derived, and the input
         nodes
-        
-        :param output_stream_name: 
-        :param output_stream_index: 
-        :param input_tokens_list: 
-        :return: 
+
+        :param output_stream_name:
+        :param output_stream_index:
+        :param input_tokens_list:
+        :return:
         """
 
         # The "token" for the tuple will be the node ID
-        window_token = pennprov.QualifiedName(self.namespace, self.get_window_id(output_stream_name, output_stream_index - 1))
+        if isinstance(output_stream_index, int):
+            window_token = pennprov.QualifiedName(self.namespace,
+                                                  self.get_window_id(output_stream_name, output_stream_index - 1))
+        else:
+            window_token = pennprov.QualifiedName(self.namespace,
+                                                  self.get_window_id(output_stream_name, output_stream_index))
+
         # Finally, we build an entity node within the graph, with the token and the
         # attributes
-        entity_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
+        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
         self.prov_dm_api.store_node(resource=self.get_graph(),
-                               token=window_token, body=entity_node)
+                                    token=window_token, body=coll_node)
+
+        logging.debug('Storing COLLECTION %s' % str(window_token))
 
         for token in input_tokens_list:
             # Add a relationship edge (of type ANNOTATED)
@@ -235,47 +252,20 @@ class MProvConnection:
             token_qname = pennprov.QualifiedName(self.namespace, token)
             annotates = pennprov.RelationModel(
                 type='MEMBERSHIP', subject_id=token_qname, object_id=window_token, attributes=[])
+
             self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='membership')
 
         return window_token
 
-    def get_prov_nodes(self, stream_name):
-        # type: (str) -> Dict[str,BasicTuple]
-        nodes = self.prov_api.get_provenance_nodes(self.get_graph())
-        result = {}
-        for i in nodes:
-            result[i] = nodes[i]['tuple']
-        return result
-
-    def get_prov_edges_from(self, node_id):
-        # type: (str) -> List[str]
-        edges = self.prov_api.get_connected_from(self.get_graph(), node_id)
-        return edges
-
-    def get_prov_edges_to(self, node_id):
-        # type: (str) -> List[str]
-        edges = self.prov_api.get_connected_from(self.get_graph(), node_id)
-        return edges
-
-    def get_prov_labeled_edges_from(self, node_id, label):
-        # type: (str) -> List[str]
-        edges = self.prov_api.get_connected_from(self.get_graph(), node_id, label=label)
-        return edges
-
-    def get_prov_labeled_edges_to(self, node_id, label):
-        # type: (str) -> List[str]
-        edges = self.prov_api.get_connected_from(self.get_graph(), node_id, label=label)
-        return edges
-
     def store_windowed_result(self,
-                                output_stream_name,
-                                output_stream_index,
-                                output_tuple,
-                                input_tokens_list,
-                                activity,
-                                start,
-                                end
-                                ):
+                              output_stream_name,
+                              output_stream_index,
+                              output_tuple,
+                              input_tokens_list,
+                              activity,
+                              start,
+                              end
+                              ):
         # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
         """
         When we have a windowed computation, this creates a complex derivation subgraph
@@ -305,6 +295,6 @@ class MProvConnection:
 
         generates = pennprov.RelationModel(
             type='GENERATION', subject_id=activity_token, object_id=result_token, attributes=[])
-        self.prov_dm_api.store_relation(resource=self.get_graph(), body=uses, label='generation')
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='generation')
 
         return window_token
