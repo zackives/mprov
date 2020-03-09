@@ -16,25 +16,41 @@ Store a PROV DM node
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.ProvDmApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-token = 'token_example' # str | 
-body = pennprov.NodeModel() # NodeModel | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Store a PROV DM node
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_instance.store_node(resource, token, body)
 except ApiException as e:
     print("Exception when calling ProvDmApi->store_node: %s\n" % e)
@@ -71,25 +87,41 @@ Store a relation between PROV DM tokens
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.ProvDmApi(pennprov.ApiClient(configuration))
-resource = 'resource_example' # str | 
-body = pennprov.RelationModel() # RelationModel | 
-label = 'label_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Store a relation between PROV DM tokens
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_instance.store_relation(resource, body, label)
 except ApiException as e:
     print("Exception when calling ProvDmApi->store_relation: %s\n" % e)
