@@ -28,8 +28,9 @@ class MProvConnection:
 
     namespace = 'http://mprov.md2k.org'
     graph_name = "mProv-graph"
+    default_host = "http://localhost:8088"
 
-    def __init__(self, user, password, host):
+    def __init__(self, user, password, host=None):
         # type: (str, str, str) -> None
         """
         Establish a connection to a PennProvenance server
@@ -38,10 +39,7 @@ class MProvConnection:
         :param host: Host URL, or None to use localhost
         """
         self.configuration = pennprov.configuration.Configuration()
-        if host:
-            self.configuration.host = host
-        else:
-            self.configuration.host = "http://localhost:8088"
+        self.configuration.host = host or MProvConnection.default_host
 
         api_client = pennprov.ApiClient(self.configuration)
         self.auth_api = pennprov.AuthenticationApi(api_client)
@@ -57,8 +55,10 @@ class MProvConnection:
 
         self.configuration.api_key["api_key"] = self.token
 
-        self.prov_api.create_or_reset_provenance_graph(self.get_graph())
         return
+
+    def create_or_reset_graph(self):
+        self.prov_api.create_or_reset_provenance_graph(self.get_graph())
 
     def get_graph(self):
         """
@@ -88,22 +88,26 @@ class MProvConnection:
         return self.username
 
     # Create a unique ID for an operator stream window
-    def get_window_id(self, stream_operator, id):
+    @staticmethod
+    def get_window_id(stream_operator, id):
         # type: (str, Any) -> str
         return stream_operator + '_w.' + str(id)
 
     # Create a unique ID for a stream operator result
-    def get_result_id(self, stream, id):
+    @staticmethod
+    def get_result_id(stream, id):
         # type: (str, Any) -> str
         return stream + '._r' + str(id)
 
     # Create a unique ID for an entity
-    def get_entity_id(self, stream, id):
+    @staticmethod
+    def get_entity_id(stream, id):
         # type: (str, Any) -> str
         return stream + '._e' + str(id)
 
     # Create a unique ID for an activity (a stream operator call)
-    def get_activity_id(self, operator, id):
+    @staticmethod
+    def get_activity_id(operator, id):
         # type: (str, Any) -> str
         return operator + '._e' + str(id)
 
@@ -251,9 +255,9 @@ class MProvConnection:
             # from window to its inputs
             token_qname = pennprov.QualifiedName(self.namespace, token)
             annotates = pennprov.RelationModel(
-                type='MEMBERSHIP', subject_id=token_qname, object_id=window_token, attributes=[])
+                type='MEMBERSHIP', subject_id=window_token, object_id=token_qname, attributes=[])
 
-            self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='membership')
+            self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='hadMember')
 
         return window_token
 
@@ -287,14 +291,14 @@ class MProvConnection:
 
         derives = pennprov.RelationModel(
             type='DERIVATION', subject_id=result_token, object_id=window_token, attributes=[])
-        self.prov_dm_api.store_relation(resource=self.get_graph(), body=derives, label='derivation')
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
 
         uses = pennprov.RelationModel(
             type='USAGE', subject_id=activity_token, object_id=window_token, attributes=[])
-        self.prov_dm_api.store_relation(resource=self.get_graph(), body=uses, label='usage')
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=uses, label='used')
 
         generates = pennprov.RelationModel(
-            type='GENERATION', subject_id=activity_token, object_id=result_token, attributes=[])
-        self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='generation')
+            type='GENERATION', subject_id=result_token, object_id=activity_token, attributes=[])
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
 
         return window_token

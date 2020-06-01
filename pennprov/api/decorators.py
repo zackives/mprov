@@ -4,33 +4,16 @@ import logging
 from datetime import timezone, datetime
 from functools import wraps
 import os
-from pyspark import broadcast
 from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 import pandas as pd
 
-# Try environment variables first
-try:
-    mprov_user = os.environ['MPROV_USER']
-    mprov_password = os.environ['MPROV_PASSWORD']
-    mprov_host = os.environ['MPROV_HOST']
-    mprov_conn = None
-except KeyError:
-    # Try simple defaults second
-    try:
-        mprov_user = 'YOUR_USERNAME'
-        mprov_password = 'YOUR_PASSWORD'
-        mprov_conn = None
-    except KeyError:
-        mprov_conn = None
-
-
-def get_entity_id(stream, id):
-    # type: (str, Any) -> str
-    return stream + '._e' + str(id)
 
 blank = BasicSchema({})
 blank_tuple = BasicTuple(blank)
+
+get_entity_id = MProvConnection.get_entity_id
 
 def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],map=None):
     """
@@ -76,12 +59,13 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             #print(f"Calling {func.__name__}({signature})")
             val = func(arg)#*args, **kwargs)
 
-            mprov_conn = MProvConnection(mprov_user, mprov_password, mprov_host)
+            connection_key = MProvConnectionCache.Key()
+            mprov_conn = MProvConnectionCache.get_connection(connection_key)
 
             window_ids = []
             for t in rel_keys(arg, in_stream_key):
                 if mprov_conn:
-                    window_ids.append(mprov_conn.get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
+                    window_ids.append(get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
                 else:
                     window_ids.append(get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
 
@@ -115,21 +99,28 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
         return wrapper
     return inner_function
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'])
-def test(n):
-    return n.groupby('x').count()
+if __name__ == '__main__':
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'])
-def testx(n):
-    return n.groupby('x').count()
+    @MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'])
+    def test(n):
+        return n.groupby('x').count()
 
-import pandas as pd
+    @MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'])
+    def testx(n):
+        return n.groupby('x').count()
 
-data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
-test(data)
-testx(data)
+    import pandas as pd
+    logging.basicConfig(level=logging.DEBUG)
+    connection_key = MProvConnectionCache.Key()
+    mprov_conn = MProvConnectionCache.get_connection(connection_key)
+    if mprov_conn:
+        mprov_conn.create_or_reset_graph()
 
-df = data
+    data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
+    test(data)
+    testx(data)
+
+    df = data
 
 ####  [i1] \
 ####  [i2] -- [w_{i1,i2,i3}] -used-> (f) -generates-> [o123]
