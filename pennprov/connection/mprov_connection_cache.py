@@ -51,13 +51,13 @@ class MProvConnectionCache:
         connection = cls.connections.get(connection_key, None)
         if connection:
             logging.debug(
-                'MProvConnectionCache: process %s retrieved cached connection %s', os.getpgid(), id(connection))
+                'MProvConnectionCache: process %s retrieved cached connection %s', os.getpid(), id(connection))
         else:
             try:
                 connection = MProvConnection(
                     connection_key.user, connection_key.password, connection_key.host)
                 logging.debug(
-                    'MProvConnectionCache: process %s created new connection %s', os.getpgid(), id(connection))
+                    'MProvConnectionCache: process %s created new connection %s', os.getpid(), id(connection))
             except Exception as e:
                 logging.debug(e, exc_info=True)
                 connection = None
