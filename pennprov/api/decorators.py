@@ -15,7 +15,7 @@ blank_tuple = BasicTuple(blank)
 
 get_entity_id = MProvConnection.get_entity_id
 
-def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],map=None):
+def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],map=None,connection_key=None):
     """
     MProvAgg: decorator for an aggregation operation over windows.  Creates a provenance
     node for each output stream element and attaches it to the in_stream_keys for the inputs.
@@ -59,8 +59,8 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             #print(f"Calling {func.__name__}({signature})")
             val = func(arg)#*args, **kwargs)
 
-            connection_key = MProvConnectionCache.Key()
-            mprov_conn = MProvConnectionCache.get_connection(connection_key)
+            key = connection_key or MProvConnectionCache.Key()
+            mprov_conn = MProvConnectionCache.get_connection(key)
 
             window_ids = []
             for t in rel_keys(arg, in_stream_key):

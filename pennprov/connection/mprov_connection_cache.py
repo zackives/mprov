@@ -56,6 +56,8 @@ class MProvConnectionCache:
             try:
                 connection = MProvConnection(
                     connection_key.user, connection_key.password, connection_key.host)
+                connection.set_graph(connection_key.graph)
+                
                 logging.debug(
                     'MProvConnectionCache: process %s created new connection %s', os.getpid(), id(connection))
             except Exception as e:
@@ -63,6 +65,5 @@ class MProvConnectionCache:
                 connection = None
 
             if connection:
-                connection.set_graph(connection_key.graph)
                 cls.connections[connection_key] = connection
         return connection
