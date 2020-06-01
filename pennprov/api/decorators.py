@@ -74,7 +74,7 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
                     out_keys = val.reset_index()[out_stream_key[0]].to_list()
                 else:
                     out_keys = []
-                    print(val.reset_index()[out_stream_key])
+                    # print(val.reset_index()[out_stream_key])
                     for tup in val.reset_index()[out_stream_key].iterrows():
                         out_keys.append(tup[1].to_list())
             else:
@@ -84,14 +84,13 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             if mprov_conn:
                 #try:
                 for t in rel_keys(arg, in_stream_key):
-                    print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
+                    #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
                     mprov_conn.store_stream_tuple(in_stream_name, [t[k] for k in in_stream_key], blank_tuple)
                 #except:
                 #    pass
-                print (window_ids)
+                #print (window_ids)
                 mprov_conn.store_windowed_result(out_stream_name, 'w'+str(out_keys), blank_tuple,
                                                  window_ids, op, ts, ts)
-                logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w' + str(out_keys), op, str(window_ids))
             else:
                 logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w'+str(out_keys), op, str(window_ids))
 
@@ -123,6 +122,6 @@ if __name__ == '__main__':
     df = data
 
 ####  [i1] \
-####  [i2] -- [w_{i1,i2,i3}] -used-> (f) -generates-> [o123]
+####  [i2] -- [w_{i1,i2,i3}] <-used- (f) <-wasGeneratedBy- [o123]
 ####  [i3] /
 ####

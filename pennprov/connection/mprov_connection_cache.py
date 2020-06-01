@@ -18,6 +18,7 @@ import logging
 from pennprov.connection.mprov_connection import MProvConnection
 from urllib3.exceptions import NewConnectionError
 
+logger = logging.getLogger(__name__)
 
 class MProvConnectionCache:
     class Key:
@@ -50,7 +51,7 @@ class MProvConnectionCache:
          # type: (MProvConnectionCache.Key) -> MProvConnection
         connection = cls.connections.get(connection_key, None)
         if connection:
-            logging.debug(
+            logger.debug(
                 'MProvConnectionCache: process %s retrieved cached connection %s', os.getpid(), id(connection))
         else:
             try:
@@ -58,10 +59,10 @@ class MProvConnectionCache:
                     connection_key.user, connection_key.password, connection_key.host)
                 connection.set_graph(connection_key.graph)
                 
-                logging.debug(
+                logger.debug(
                     'MProvConnectionCache: process %s created new connection %s', os.getpid(), id(connection))
             except Exception as e:
-                logging.debug(e, exc_info=True)
+                logger.debug(e, exc_info=True)
                 connection = None
 
             if connection:
