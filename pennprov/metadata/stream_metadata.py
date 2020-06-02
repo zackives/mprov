@@ -29,13 +29,15 @@ class BasicSchema:
     def init1(self, name):
         # type: (str) -> None
         self.name = name
+        self.fields = []
+        self.types = []
 
     def init2(self, name, fields_types):
         # type: (str, dict) -> None
         """ Initialize with a name and a dictionary of attributes to types """
         self.name = name
         self.fields = []
-        self.values = []
+        self.types = []
         for k in fields_types.keys():
             self.fields.append(k)
             self.types.append(fields_types[k])
@@ -45,7 +47,7 @@ class BasicSchema:
         """ Initialize with a name and a list of field-type pairs """
         self.name = name
         self.fields = fields
-        self.values = types
+        self.types = types
 
     def add_field(self, k, v):
         # type: (str, Any) -> None
@@ -76,7 +78,7 @@ class BasicSchema:
 
     def create_tuple_dict(self, content):
         # type: (dict) -> BasicTuple
-        return BasicTuple(self, dict)
+        return BasicTuple(self, content)
 
     def create_tuple_list(self, content):
         # type (list) -> BasicTuple
