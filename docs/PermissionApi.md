@@ -24,23 +24,41 @@ Adds a new labeled permission type
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-permname = 'permname_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Adds a new labeled permission type
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.add_permission(permname)
     pprint(api_response)
 except ApiException as e:
@@ -76,24 +94,41 @@ Gets the group's permissions on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-group_name = 'group_name_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Gets the group's permissions on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.get_group_permissions_on(object, group_name)
     pprint(api_response)
 except ApiException as e:
@@ -130,24 +165,41 @@ Gets the object ids for which the user has the given permission
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-permname = 'permname_example' # str | 
-username = 'username_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Gets the object ids for which the user has the given permission
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.get_object_ids(permname, username)
     pprint(api_response)
 except ApiException as e:
@@ -184,23 +236,41 @@ Gets a permission's name from its integer ID
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-id = 56 # int | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Gets a permission's name from its integer ID
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.get_permission_from_id(id)
     pprint(api_response)
 except ApiException as e:
@@ -236,23 +306,41 @@ Gets a permission's ID from its name
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-name = 'name_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Gets a permission's ID from its name
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.get_permission_id(name)
     pprint(api_response)
 except ApiException as e:
@@ -288,24 +376,41 @@ Gets the user's permissions on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-username = 'username_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Gets the user's permissions on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.get_user_permissions_on(object, username)
     pprint(api_response)
 except ApiException as e:
@@ -342,25 +447,41 @@ Grants a group a permission on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-group_name = 'group_name_example' # str | 
-permname = 'permname_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Grants a group a permission on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.grant_group_permission_on(object, group_name, permname)
     pprint(api_response)
 except ApiException as e:
@@ -398,25 +519,41 @@ Grants a user a permission on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-username = 'username_example' # str | 
-permname = 'permname_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Grants a user a permission on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.grant_user_permission_on(object, username, permname)
     pprint(api_response)
 except ApiException as e:
@@ -454,25 +591,41 @@ Revokes a group a permission on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-group_name = 'group_name_example' # str | 
-permname = 'permname_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Revokes a group a permission on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.revoke_group_permission_on(object, group_name, permname)
     pprint(api_response)
 except ApiException as e:
@@ -510,25 +663,41 @@ Revokes a user a permission on an object
 ### Example
 ```python
 from __future__ import print_function
+import argparse
+import getpass
 import time
 import pennprov
 from pennprov.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: jwt
-configuration = pennprov.Configuration()
-configuration.api_key['api_key'] = 'YOUR_API_KEY'
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api_key'] = 'Bearer'
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', required=True, help='username')
+parser.add_argument('-p', '--password',
+                    help='password (will be prompted if omitted)')
 
-# create an instance of the API class
-api_instance = pennprov.PermissionApi(pennprov.ApiClient(configuration))
-object = 'object_example' # str | 
-username = 'username_example' # str | 
-permname = 'permname_example' # str | 
+args = parser.parse_args()
+username = args.user
+password = args.password if args.password else getpass.getpass()
+
+"""Get a token and store a node"""
+# create instances of the API classes
+configuration = pennprov.configuration.Configuration()
+configuration.host = "http://localhost:8088"
+api_client = pennprov.ApiClient(configuration)    
+auth_api = pennprov.AuthenticationApi(api_client)
+prov_api = pennprov.ProvenanceApi(api_client)
+prov_dm_api = pennprov.ProvDmApi(api_client)
+credentials = pennprov.UserCredentials(password)
+graph_name = "my_graph"
 
 try:
     # Revokes a user a permission on an object
+    # One-time initialization of client with a JWT token for
+    # authentication.
+    web_token = auth_api.get_token_route(username, credentials)
+    token = web_token.token
+    print("Setting token %s\n" % token)
+    configuration.api_key["api_key"] = token
     api_response = api_instance.revoke_user_permission_on(object, username, permname)
     pprint(api_response)
 except ApiException as e:

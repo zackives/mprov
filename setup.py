@@ -14,7 +14,7 @@
 from setuptools import setup, find_packages  # noqa: H301
 
 NAME = "pennprov"
-VERSION = "2.2.4"
+VERSION = "2.2.5"
 # To install the library, run the following
 #
 # python setup.py install
@@ -26,7 +26,9 @@ REQUIRES = [
     "certifi>=2017.4.17",
     "python-dateutil>=2.1",
     "six>=1.10",
-    "urllib3>=1.23"
+    "urllib3>=1.23",
+    "pandas>=1.0",
+    "pyspark>=2.4"
 ]
     
 
