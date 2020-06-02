@@ -4,35 +4,18 @@ import logging
 from datetime import timezone, datetime
 from functools import wraps
 import os
-from pyspark import broadcast
 from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 import pandas as pd
 
-# Try environment variables first
-try:
-    mprov_user = os.environ['MPROV_USER']
-    mprov_password = os.environ['MPROV_PASSWORD']
-    mprov_host = os.environ['MPROV_HOST']
-    mprov_conn = None
-except KeyError:
-    # Try simple defaults second
-    try:
-        mprov_user = 'YOUR_USERNAME'
-        mprov_password = 'YOUR_PASSWORD'
-        mprov_conn = None
-    except KeyError:
-        mprov_conn = None
-
-
-def get_entity_id(stream, id):
-    # type: (str, Any) -> str
-    return stream + '._e' + str(id)
 
 blank = BasicSchema({})
 blank_tuple = BasicTuple(blank)
 
-def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],map=None):
+get_entity_id = MProvConnection.get_entity_id
+
+def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],map=None,connection_key=None):
     """
     MProvAgg: decorator for an aggregation operation over windows.  Creates a provenance
     node for each output stream element and attaches it to the in_stream_keys for the inputs.
@@ -76,12 +59,13 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             #print(f"Calling {func.__name__}({signature})")
             val = func(arg)#*args, **kwargs)
 
-            mprov_conn = MProvConnection(mprov_user, mprov_password, mprov_host)
+            key = connection_key or MProvConnectionCache.Key()
+            mprov_conn = MProvConnectionCache.get_connection(key)
 
             window_ids = []
             for t in rel_keys(arg, in_stream_key):
                 if mprov_conn:
-                    window_ids.append(mprov_conn.get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
+                    window_ids.append(get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
                 else:
                     window_ids.append(get_entity_id(in_stream_name, [t[k] for k in in_stream_key]))
 
@@ -90,7 +74,7 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
                     out_keys = val.reset_index()[out_stream_key[0]].to_list()
                 else:
                     out_keys = []
-                    print(val.reset_index()[out_stream_key])
+                    # print(val.reset_index()[out_stream_key])
                     for tup in val.reset_index()[out_stream_key].iterrows():
                         out_keys.append(tup[1].to_list())
             else:
@@ -100,14 +84,13 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             if mprov_conn:
                 #try:
                 for t in rel_keys(arg, in_stream_key):
-                    print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
+                    #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
                     mprov_conn.store_stream_tuple(in_stream_name, [t[k] for k in in_stream_key], blank_tuple)
                 #except:
                 #    pass
-                print (window_ids)
+                #print (window_ids)
                 mprov_conn.store_windowed_result(out_stream_name, 'w'+str(out_keys), blank_tuple,
                                                  window_ids, op, ts, ts)
-                logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w' + str(out_keys), op, str(window_ids))
             else:
                 logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w'+str(out_keys), op, str(window_ids))
 
@@ -115,23 +98,30 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
         return wrapper
     return inner_function
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'])
-def test(n):
-    return n.groupby('x').count()
+if __name__ == '__main__':
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'])
-def testx(n):
-    return n.groupby('x').count()
+    @MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'])
+    def test(n):
+        return n.groupby('x').count()
 
-import pandas as pd
+    @MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'])
+    def testx(n):
+        return n.groupby('x').count()
 
-data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
-test(data)
-testx(data)
+    import pandas as pd
+    logging.basicConfig(level=logging.DEBUG)
+    connection_key = MProvConnectionCache.Key()
+    mprov_conn = MProvConnectionCache.get_connection(connection_key)
+    if mprov_conn:
+        mprov_conn.create_or_reset_graph()
 
-df = data
+    data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
+    test(data)
+    testx(data)
+
+    df = data
 
 ####  [i1] \
-####  [i2] -- [w_{i1,i2,i3}] -used-> (f) -generates-> [o123]
+####  [i2] -- [w_{i1,i2,i3}] <-used- (f) <-wasGeneratedBy- [o123]
 ####  [i3] /
 ####
