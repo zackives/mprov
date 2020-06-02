@@ -163,7 +163,7 @@ class MProvConnection:
         data = []
         for i, k in enumerate(input_tuple.schema.fields):
             qkey = pennprov.QualifiedName(self.namespace, k)
-            data.append(pennprov.Attribute(name=qkey, value=input_tuple[i], type='STRING'))
+            data.append(pennprov.Attribute(name=qkey, value=input_tuple[k], type='STRING'))
 
         # Finally, we build an entity node within the graph, with the token and the
         # attributes
@@ -256,6 +256,47 @@ class MProvConnection:
             self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='membership')
 
         return window_token
+
+    def store_derived_result(self,
+                              output_stream_name,
+                              output_stream_index,
+                              output_tuple,
+                              input_token,
+                              activity,
+                              start,
+                              end
+                              ):
+        # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
+        """
+        When we have a windowed computation, this creates a complex derivation subgraph
+        in one operation.
+
+        :param output_stream_name: The name of the stream our operator produces
+        :param output_stream_index: The position of the outgoing tuple in the stream
+        :param output_tuple: The tuple itself
+        :param input_tokens_list: IDs of the inputs to the computation
+        :param activity: The computation name
+        :param start: Start time
+        :param end: End time
+        :return:
+        """
+        result_token = self.store_stream_tuple(output_stream_name, output_stream_index, output_tuple)
+
+        activity_token = self.store_activity(activity, start, end, output_stream_index)
+
+        derives = pennprov.RelationModel(
+            type='DERIVATION', subject_id=result_token, object_id=input_token, attributes=[])
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=derives, label='derivation')
+
+        uses = pennprov.RelationModel(
+            type='USAGE', subject_id=activity_token, object_id=input_token, attributes=[])
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=uses, label='usage')
+
+        generates = pennprov.RelationModel(
+            type='GENERATION', subject_id=activity_token, object_id=result_token, attributes=[])
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='generation')
+
+        return result_token
 
     def store_windowed_result(self,
                               output_stream_name,

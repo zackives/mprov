@@ -35,7 +35,6 @@ class BasicSchema:
         """ Initialize with a name and a dictionary of attributes to types """
         self.name = name
         self.fields = []
-        self.values = []
         for k in fields_types.keys():
             self.fields.append(k)
             self.types.append(fields_types[k])
@@ -45,7 +44,7 @@ class BasicSchema:
         """ Initialize with a name and a list of field-type pairs """
         self.name = name
         self.fields = fields
-        self.values = types
+        self.types = types
 
     def add_field(self, k, v):
         # type: (str, Any) -> None
