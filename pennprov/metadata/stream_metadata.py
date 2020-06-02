@@ -75,7 +75,7 @@ class BasicSchema:
 
     def create_tuple_dict(self, content):
         # type: (dict) -> BasicTuple
-        return BasicTuple(self, dict)
+        return BasicTuple(self, content)
 
     def create_tuple_list(self, content):
         # type (list) -> BasicTuple
