@@ -29,12 +29,15 @@ class BasicSchema:
     def init1(self, name):
         # type: (str) -> None
         self.name = name
+        self.fields = []
+        self.types = []
 
     def init2(self, name, fields_types):
         # type: (str, dict) -> None
         """ Initialize with a name and a dictionary of attributes to types """
         self.name = name
         self.fields = []
+        self.types = []
         for k in fields_types.keys():
             self.fields.append(k)
             self.types.append(fields_types[k])
