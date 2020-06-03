@@ -20,10 +20,33 @@ from urllib3.exceptions import NewConnectionError
 
 logger = logging.getLogger(__name__)
 
+
 class MProvConnectionCache:
+    """
+    A simple in-memory cache for MProvConnections
+    where the connections are stored in a class variable dict.
+    """
     class Key:
-        def __init__(self, graph=None, user=None, password=None, host=None):
-            self.graph = graph or MProvConnection.graph_name
+        """
+        A key for the connection cache. Instances should not be modified after instantiation.
+        """
+
+        def __init__(self, graph=MProvConnection.graph_name, user=None, password=None, host=None):
+            # type: (str, str, str, str) -> MProvConnectionCache.Key
+            """
+            :param graph:    The name of the graph with which this connection will be interacting.
+                             Defaults to MProvConnection.graph_name
+            :param user:     The username to use for the connection.
+                             Defaults to the value of the environment variable MPROV_USER
+            :param password: The password to use for the connection.
+                             Defaults to the value of the environment variable MPROV_PASSWORD
+            :param host:     The host to use for the connection, e.g., 'http://localhost:1234'
+                             Defaults to the value of the environment variable MPROV_HOST if set,
+                             otherwise to MProvConnection.default_host
+            :raises:         ValueError if user is None and MPROV_USER is not set
+                             or if password is None and MPROV_PASSWORD is not set
+            """
+            self.graph = graph
             self.user = user or os.environ.get('MPROV_USER')
             self.password = password or os.environ.get('MPROV_PASSWORD')
             self.host = host or os.environ.get(
@@ -48,7 +71,15 @@ class MProvConnectionCache:
 
     @classmethod
     def get_connection(cls, connection_key):
-         # type: (MProvConnectionCache.Key) -> MProvConnection
+        # type: (MProvConnectionCache.Key) -> MProvConnection
+        """
+        Returns a cached MProvConnection for the given key if one has been previously cached.
+        Otherwise, attempts to create, cache, and return a newly created connection.
+        If the connection cannot be created, None is returned and the error is logged at the DEBUG level.
+
+        :param connection_key: an MProvConnectionCache.Key
+        :return: the connection associated with connection_key or a newly created connection
+        """
         connection = cls.connections.get(connection_key, None)
         if connection:
             logger.debug(
@@ -58,7 +89,7 @@ class MProvConnectionCache:
                 connection = MProvConnection(
                     connection_key.user, connection_key.password, connection_key.host)
                 connection.set_graph(connection_key.graph)
-                
+
                 logger.debug(
                     'MProvConnectionCache: process %s created new connection %s', os.getpid(), id(connection))
             except Exception as e:
