@@ -335,7 +335,7 @@ class MProvConnection:
 
     def create_collection(self,
                           collection_name, collection_version,
-                          prior_token):
+                          prior_token=None):
         # type: (str, int, pennprov.QualifiedName) -> pennProv.QualifiedName
         """
         We can create a collection to represent a sub-sequence, a sub-stream, or a subset of items

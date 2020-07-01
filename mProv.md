@@ -2,11 +2,13 @@
 
 mProv stores **provenance information** using the PROV-DM model.  This represents data and its associations with activities, agents (users), and other entities in a *graph*.
 
-## Using the Manual API
+## The Manual API
 
 Let's suppose we are running a stream computation through a pipeline of operators (eg in Apache Spark).
 
 We can establish a connection to mProv by instantiating `MProvConnection`.
+
+## Basics
 
 As we read a tuple from the stream, we want to:
 
@@ -29,3 +31,6 @@ collection, which are then processed by `G` resulting in a stream output result 
 a sub-stream.  To represent this, we can create a *collection* representing the stream or sub-stream, annotate the collection, and associate each tuple
 with the collection.  To do this, we provide `create_collection`, we allow the user to `store_annotations` on a collection, and we include `add_to_collection` 
 to link a tuple to a collection.
+
+**Connection Cache.** For certain situations, we would like there to be a single connection per Python interpreter.
+The `MProvConnectionCache` allows us to
