@@ -115,9 +115,24 @@ if __name__ == '__main__':
     if mprov_conn:
         mprov_conn.create_or_reset_graph()
 
+    # Test the decorators, which will create entities for the dataframe
+    # elements, and nodes representing the dataframe components
     data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
     test(data)
     testx(data)
+
+    # Now let's put all of the elements into a sub-stream collection
+    sub_stream = mprov_conn.create_collection('sub_stream', 1, None)
+    tuple_token = mprov_conn.get_qname(get_entity_id('ecg', '[1]'))
+    mprov_conn.add_to_collection(tuple_token, sub_stream)
+    tuple_token = mprov_conn.get_qname(get_entity_id('ecg', '[3]'))
+    mprov_conn.add_to_collection(tuple_token, sub_stream)
+    tuple_token = mprov_conn.get_qname(get_entity_id('ecg', '[1, 2]'))
+    mprov_conn.add_to_collection(tuple_token, sub_stream)
+    tuple_token = mprov_conn.get_qname(get_entity_id('ecg', '[3, 4]'))
+    mprov_conn.add_to_collection(tuple_token, sub_stream)
+
+    mprov_conn.store_annotations(sub_stream, {'name': 'ecg', 'date': '01-01-01'})
 
     df = data
 

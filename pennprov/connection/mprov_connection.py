@@ -179,6 +179,37 @@ class MProvConnection:
 
         return token
 
+    def store_annotations(self,
+                         node_token,
+                         annotation_dict):
+        # type: (pennprov.QualifiedName, dict) -> pennprov.QualifiedName
+        """
+        Associate a map of annotations with a node ID
+
+        :param node_token:
+        :param annotation_dict:
+        :return:
+        """
+
+        for k in annotation_dict.keys():
+            ann_token = pennprov.QualifiedName(self.namespace,
+                                               node_token.local_part + "." + k)
+
+            # The key/value pair will itself be an entity node
+            attributes = [
+                pennprov.Attribute(name=pennprov.QualifiedName(self.namespace, k), value=annotation_dict[k],
+                                   type='STRING')]
+            entity_node = pennprov.NodeModel(type='ENTITY', attributes=attributes)
+            self.prov_dm_api.store_node(resource=self.get_graph(),
+                                        token=ann_token, body=entity_node)
+
+            # Then we add a relationship edge (of type ANNOTATED)
+            annotates = pennprov.RelationModel(
+                type='ANNOTATED', subject_id=node_token, object_id=ann_token, attributes=[])
+            self.prov_dm_api.store_relation(resource=self.get_graph(), body=annotates, label='_annotated')
+
+        return ann_token
+
     def store_annotation(self,
                          stream_name,
                          stream_index,
@@ -302,6 +333,46 @@ class MProvConnection:
 
         return result_token
 
+    def create_collection(self,
+                          collection_name, collection_version,
+                          prior_token):
+        # type: (str, int, pennprov.QualifiedName) -> pennProv.QualifiedName
+        """
+        We can create a collection to represent a sub-sequence, a sub-stream, or a subset of items
+
+        :param collection_name:
+        :param collection_version:
+        :param prior_token:
+        :return:
+        """
+        token = pennprov.QualifiedName(self.namespace, self.get_entity_id(collection_name, collection_version))
+
+        # Create a node for the collection
+        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
+        self.prov_dm_api.store_node(resource=self.get_graph(),
+                                    token=token, body=coll_node)
+
+        if prior_token:
+            derives = pennprov.RelationModel(
+                type='REVISION', subject_id=token, object_id=prior_token, attributes=[])
+            self.prov_dm_api.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
+
+        return token
+
+    def add_to_collection(self, tuple_token, collection_token):
+        # Type (pennprov.QualifiedName, pennprov.QualifiedName) -> pennprov.QualifiedName
+        """
+        Associate a tuple with a collection (using the tokens for each)
+
+        :param tuple_token:
+        :param collection_token:
+        :return:
+        """
+        part_of = pennprov.RelationModel(
+            type='MEMBERSHIP', subject_id=collection_token, object_id=tuple_token, attributes=[])
+
+        self.prov_dm_api.store_relation(resource=self.get_graph(), body=part_of, label='hadMember')
+
     def store_windowed_result(self,
                               output_stream_name,
                               output_stream_index,
@@ -343,3 +414,7 @@ class MProvConnection:
         self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
 
         return window_token
+
+    def get_qname(self, token):
+        # types: (str) -> pennProv.QualifiedName
+        return pennprov.QualifiedName(self.namespace, token)

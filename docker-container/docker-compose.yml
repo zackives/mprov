@@ -19,6 +19,8 @@ services:
     ports:
      - "7474:7474"
      - "7687:7687"
+    volumes:
+     - /docker/neo4j:/data
     environment:
      NEO4J_AUTH: "neo4j/habitat1"
 
