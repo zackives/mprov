@@ -107,7 +107,7 @@ if __name__ == '__main__':
     connection_key = MProvConnectionCache.Key()
     mprov_conn = MProvConnectionCache.get_connection(connection_key)
     if mprov_conn:
-        mprov_conn.create_or_reset_graph()
+        mprov_conn.create_or_reuse_graph()
 
     sub_stream_1 = mprov_conn.create_collection('sub_stream_1', 1)
     sub_stream_2 = mprov_conn.create_collection('sub_stream_2', 1)

@@ -60,6 +60,9 @@ class MProvConnection:
     def create_or_reset_graph(self):
         self.prov_api.create_or_reset_provenance_graph(self.get_graph())
 
+    def create_or_reuse_graph(self):
+        self.prov_api.create_provenance_graph(self.get_graph())
+
     def get_graph(self):
         """
         Within the storage system, get the name of the graph
