@@ -15,7 +15,7 @@ blank_tuple = BasicTuple(blank)
 
 get_entity_id = MProvConnection.get_entity_id
 
-def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],collection=None,map=None,connection_key=None):
+def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],collection=None,connection_key=None):
     """
     MProvAgg: decorator for an aggregation operation over windows.  Creates a provenance
     node for each output stream element and attaches it to the in_stream_keys for the inputs.
@@ -100,38 +100,5 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
         return wrapper
     return inner_function
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
 
-    import pandas as pd
-    logging.basicConfig(level=logging.DEBUG)
-    connection_key = MProvConnectionCache.Key()
-    mprov_conn = MProvConnectionCache.get_connection(connection_key)
-    if mprov_conn:
-        mprov_conn.create_or_reuse_graph()
-
-    sub_stream_1 = mprov_conn.create_collection('sub_stream_1', 1)
-    sub_stream_2 = mprov_conn.create_collection('sub_stream_2', 1)
-
-    @MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'], sub_stream_1)
-    def test(n):
-        return n.groupby('x').count()
-
-    @MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'], sub_stream_2)
-    def testx(n):
-        return n.groupby('x').count()
-
-    # Test the decorators, which will create entities for the dataframe
-    # elements, and nodes representing the dataframe components
-    data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
-    test(data)
-    testx(data)
-
-    mprov_conn.store_annotations(sub_stream_1, {'name': 'ecg', 'date': '01-01-01'})
-    mprov_conn.store_annotations(sub_stream_2, {'name': 'eeg', 'date': '01-01-05'})
-
-    df = data
-
-####  [i1] \
-####  [i2] -- [w_{i1,i2,i3}] <-used- (f) <-wasGeneratedBy- [o123]
-####  [i3] /
-####

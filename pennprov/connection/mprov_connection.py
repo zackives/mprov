@@ -13,8 +13,11 @@
 from __future__ import print_function
 from pprint import pprint
 
+from typing import List
+
 import logging
 import pennprov
+from pennprov import TupleWithSchemaModel
 from pennprov.rest import ApiException
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 
@@ -112,7 +115,7 @@ class MProvConnection:
     @staticmethod
     def get_activity_id(operator, id):
         # type: (str, Any) -> str
-        return operator + '._e' + str(id)
+        return operator + '._a' + str(id)
 
     def store_activity(self,
                        activity,
@@ -463,3 +466,117 @@ class MProvConnection:
         generates = pennprov.RelationModel(
             type='GENERATION', subject_id=output_node, object_id=activity_node, attributes=[])
         self.prov_dm_api.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
+
+    def get_node(self, entity_id):
+        # type: (pennprov.QualifiedName) -> dict
+        """
+        Returns the tuple data associated with a node ID (generally an entity node)
+        :param entity_id:
+        :return:
+        """
+        result = self.prov_api.get_provenance_data(self.get_graph(), entity_id)
+
+        ret = [{d.to_dict()['name'].split('}')[-1]: d.to_dict()['value'], 'type': d.to_dict()['type']} for d in result.tuple if d.to_dict()['name'].split('}')[-1] != 'provDmName']
+
+        return ret
+
+    def get_source_entities(self, entity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Given an entity node, what was it derived from?
+        :param entity_id:
+        :return:
+        :param entity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_from(self.get_graph(), entity_id, label='wasDerivedFrom')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_derived_entities(self, entity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        results = self.prov_api.get_connected_to(self.get_graph(), entity_id, label='wasDerivedFrom')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    # def get_predecessor_entities(self, entity_id):
+    #     # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+    #     return
+    #
+    # def get_successor_entities(self, entity_id):
+    #     # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+    #     return
+
+    def get_parent_entities(self, entity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Find a parent collection (ie a node where this node is a member)
+        :param entity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_to(self.get_graph(), entity_id, label='hadMember')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_child_entities(self, entity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Find any child (member) nodes
+        :param entity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_from(self.get_graph(), entity_id, label='hadMember')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_creating_activities(self, entity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Get the list of activities that from which this output was generated
+        :param entity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_from(self.get_graph(), entity_id, label='wasGeneratedBy')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_activity_outputs(self, activity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Get the list of entities this activity generated
+        :param activity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_to(self.get_graph(), activity_id, label='wasGeneratedBy')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_activity_inputs(self, activity_id):
+        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        """
+        Given an activity, what inputs did it use?
+        :param activity_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_from(self.get_graph(), activity_id, label='used')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+        return results
+
+    def get_annotations(self, node_id):
+        # type: (pennprov.QualifiedName) -> dict
+        """
+        Given a node, find its annotations and return as a list of typed key/values
+        :param node_id:
+        :return:
+        """
+        results = self.prov_api.get_connected_from(self.get_graph(), node_id, label='_annotated')
+        results = [self.get_qname(tok.token_value.split('}')[-1]) for tok in results.tokens]
+
+        results = [self.get_node(eid) for eid in results]
+
+        return results
+
+    # def get_entity_and_ancestor_annotations(self, entity_id):
+    #     # type: (pennprov.QualifiedName) -> dict
+    #     return
+
