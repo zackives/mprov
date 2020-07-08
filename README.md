@@ -55,9 +55,9 @@ Then (after waiting some time!) open your Web browser to http://localhost:8088 a
 
 Create a new sample user called `YOUR_USERNAME` with password `YOUR_PASSWORD`.
 
-## Getting Started - Simple Client
+## Getting Started - mProv Client
 
-Here's a brief example using `MProvConnection`.
+More detailed information is available in the [mProv API overview](mProv.md).  Here's a brief example using `MProvConnection`.
 
 ```
 from pennprov.connection.mprov_connection import MProvConnection
