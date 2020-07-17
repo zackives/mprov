@@ -33,14 +33,14 @@ mprov_conn.store_annotations(sub_stream_2, {'name': 'eeg', 'date': '01-01-05'})
 
 df = data
 
-node = mprov_conn.get_node(mprov_conn.get_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
+node = mprov_conn.get_node(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
 print (node)
 
 # What are the sources for a given output ECG (these should be windows)
-source_list = mprov_conn.get_source_entities(mprov_conn.get_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
+source_list = mprov_conn.get_source_entities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
 print (str(source_list))
 # Are there any derived?
-derived_list = mprov_conn.get_derived_entities(mprov_conn.get_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
+derived_list = mprov_conn.get_derived_entities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
 print (str(derived_list))
 
 # Take a source (window) and see if we can read it
@@ -50,7 +50,7 @@ print (str(source_node))
 tuples_list = mprov_conn.get_child_entities(source_list[0])
 print (str(tuples_list))
 
-activity = mprov_conn.get_creating_activities(mprov_conn.get_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
+activity = mprov_conn.get_creating_activities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
 print (str(activity))
 gen = mprov_conn.get_activity_outputs(activity[0])
 print (str(gen))
