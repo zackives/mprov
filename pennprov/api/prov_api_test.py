@@ -31,6 +31,8 @@ testx(data)
 mprov_conn.store_annotations(sub_stream_1, {'name': 'ecg', 'date': '01-01-01'})
 mprov_conn.store_annotations(sub_stream_2, {'name': 'eeg', 'date': '01-01-05'})
 
+#mprov_conn.flush()
+
 df = data
 
 node = mprov_conn.get_node(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
