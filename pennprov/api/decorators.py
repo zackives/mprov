@@ -98,6 +98,14 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
                 for t in rel_keys(arg, in_stream_key):
                     #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
                     tup = mprov_conn.store_stream_tuple(in_stream_name, [t[k] for k in in_stream_key], blank_tuple)
+
+                    if out_stream_name not in stored:
+                        stream_part = mprov_conn.create_collection(out_stream_name)
+                        stored[out_stream_name] = stream_part.local_part
+                    else:
+                        stream_part = mprov_conn.get_qname(stored[out_stream_name])
+                    mprov_conn.add_to_collection(tup, stream_part)
+
                     if collection:
                         mprov_conn.add_to_collection(tup, collection)
                 #except:

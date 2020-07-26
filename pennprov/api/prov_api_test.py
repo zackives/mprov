@@ -11,8 +11,8 @@ mprov_conn = MProvConnectionCache.get_connection(connection_key)
 if mprov_conn:
     mprov_conn.create_or_reset_graph()
 
-sub_stream_1 = mprov_conn.create_collection('sub_stream_1', 1)
-sub_stream_2 = mprov_conn.create_collection('sub_stream_2', 1)
+sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
+sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
 
 @MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
 def test(n):
@@ -24,16 +24,16 @@ def testx(n):
 
 # Test the decorators, which will create entities for the dataframe
 # elements, and nodes representing the dataframe components
-data = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
-test(data)
-testx(data)
+ecg = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
+test(ecg)
+testx(ecg)
 
 mprov_conn.store_annotations(sub_stream_1, {'name': 'ecg', 'date': '01-01-01'})
 mprov_conn.store_annotations(sub_stream_2, {'name': 'eeg', 'date': '01-01-05'})
 
-#mprov_conn.flush()
+mprov_conn.flush()
 
-df = data
+df = ecg
 
 node = mprov_conn.get_node(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
 print (node)

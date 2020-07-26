@@ -112,15 +112,12 @@ class MProvConnection:
 
     # Create a unique ID for an entity
     @staticmethod
-    def get_entity_id(stream, eid):
+    def get_entity_id(stream, eid=None):
         # type: (str, Any) -> str
-        return stream + '._e' + str(eid)
-
-    # Create a unique ID for a hash value
-    @staticmethod
-    def get_id_from_hash(stream):
-        # type: (str, Any) -> str
-        return '_' + stream
+        if eid:
+            return stream + '._e' + str(eid)
+        else:
+            return '_' + stream
 
     # Create a unique ID for an activity (a stream operator call)
     @staticmethod
@@ -211,7 +208,7 @@ class MProvConnection:
         stream = binascii.hexlify(dk).decode('utf-8')
 
         # The "token" for the tuple will be the node ID
-        token = self.get_id_from_hash(stream)
+        token = self.get_entity_id(stream)
 
         # Now we'll create a tuple within the provenance node, to capture the data
         data = []
@@ -378,7 +375,7 @@ class MProvConnection:
         return result_token
 
     def create_collection(self,
-                          collection_name, collection_version,
+                          collection_name, collection_version=None,
                           prior_token=None):
         # type: (str, int, pennprov.QualifiedName) -> pennprov.QualifiedName
         """
@@ -391,8 +388,13 @@ class MProvConnection:
         """
         token = self.get_token_qname(self.get_entity_id(collection_name, collection_version))
 
+        data = []
+        # data.append(pennprov.Attribute(name='collection', value=collection_name, type='STRING'))
+        # if collection_version:
+        #     data.append(pennprov.Attribute(name='version', value=collection_version, type='INTEGER'))
+
         # Create a node for the collection
-        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
+        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=data)
         self.cache.store_node(resource=self.get_graph(),
                               token=token, body=coll_node)
 
@@ -476,8 +478,11 @@ class MProvConnection:
         :param token:
         :return:
         """
-        thash = hashlib.sha1(token.encode('utf-8'))
-        return self.get_qname(thash.hexdigest())
+        if len(token) > 20:
+            thash = hashlib.sha1(token.encode('utf-8'))
+            return self.get_qname(thash.hexdigest())
+        else:
+            return self.get_qname(token)
 
     @classmethod
     def parse_qname(cls, token_value):
