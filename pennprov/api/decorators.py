@@ -1,21 +1,21 @@
-import collections
-import inspect
 import logging
 from datetime import timezone, datetime
 from functools import wraps
-import os
+
 from pennprov.connection.mprov_connection import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 import pandas as pd
-
+import inspect
 
 blank = BasicSchema({})
 blank_tuple = BasicTuple(blank)
 
 get_entity_id = MProvConnection.get_entity_id
 
-def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],collection=None,connection_key=None):
+stored = {}
+
+def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_key=['index'],collection=None,connection_key=None):
     """
     MProvAgg: decorator for an aggregation operation over windows.  Creates a provenance
     node for each output stream element and attaches it to the in_stream_keys for the inputs.
@@ -24,6 +24,8 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
     :param out_stream_name: The name of the output stream schema
     :param in_stream_key: The key fields in the input stream
     :param out_stream_key: The key fields of the output stream
+    :param collection: The name of the output stream collection, to which this result should be appended
+    :param connection_key: Unique ID for reusing cached connection to MProv server
     :return:
     """
     def md_key(stream, key_list):
@@ -57,10 +59,20 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
             #kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
             #signature = ", ".join(args_repr + kwargs_repr)
             #print(f"Calling {func.__name__}({signature})")
+
             val = func(arg)#*args, **kwargs)
 
             key = connection_key or MProvConnectionCache.Key()
             mprov_conn = MProvConnectionCache.get_connection(key)
+
+            global stored
+
+            if func.__name__ not in stored:
+                d = (inspect.getsource(func))
+                stored[func.__name__] = mprov_conn.store_code(d)
+                logging.debug('Storing %s as %s:%s', func.__name__, stored[func.__name__], d)
+
+            sig = stored[func.__name__]
 
             window_ids = []
             for t in rel_keys(arg, in_stream_key):
@@ -92,9 +104,9 @@ def MProvAgg(in_stream_name,op,out_stream_name,in_stream_key=['index'],out_strea
                 #    pass
                 #print (window_ids)
                 mprov_conn.store_windowed_result(out_stream_name, 'w'+str(out_keys), blank_tuple,
-                                                 window_ids, op, ts, ts)
+                                                 window_ids, sig, ts, ts)
             else:
-                logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w'+str(out_keys), op, str(window_ids))
+                logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w'+str(out_keys), sig, str(window_ids))
 
             return val
         return wrapper

@@ -14,6 +14,7 @@ from __future__ import print_function
 
 from typing import List, Any
 import hashlib
+import binascii
 import logging
 import re
 import pennprov
@@ -115,6 +116,12 @@ class MProvConnection:
         # type: (str, Any) -> str
         return stream + '._e' + str(eid)
 
+    # Create a unique ID for a hash value
+    @staticmethod
+    def get_id_from_hash(stream):
+        # type: (str, Any) -> str
+        return '_' + stream
+
     # Create a unique ID for an activity (a stream operator call)
     @staticmethod
     def get_activity_id(operator, aid):
@@ -184,6 +191,38 @@ class MProvConnection:
         entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
         self.cache.store_node(resource=self.get_graph(),
                               token=token, body=entity_node)
+
+        logging.debug('Storing ENTITY ' + str(token))
+
+        return token
+
+    def store_code(self, code):
+        # type: (str) -> str
+
+        """
+        Store a code definition as an entity
+
+        :param code: Source code definition
+        :return: String ID (local part of QName) for the node
+        """
+
+        dk = hashlib.pbkdf2_hmac('sha256', code.encode('utf-8'), b'mprov', 10000)
+
+        stream = binascii.hexlify(dk).decode('utf-8')
+
+        # The "token" for the tuple will be the node ID
+        token = self.get_id_from_hash(stream)
+
+        # Now we'll create a tuple within the provenance node, to capture the data
+        data = []
+        data.append(pennprov.Attribute(name=self.get_qname('_prov'), value=token, type='STRING'))
+        data.append(pennprov.Attribute(name=self.get_qname('_code'), value=code, type='STRING'))
+
+        # Finally, we build an entity node within the graph, with the token and the
+        # attributes
+        entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
+        self.cache.store_node(resource=self.get_graph(),
+                              token=self.get_token_qname(token), body=entity_node)
 
         logging.debug('Storing ENTITY ' + str(token))
 

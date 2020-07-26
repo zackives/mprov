@@ -57,6 +57,7 @@ was derived from another collection), we provide a series of API calls for this:
 mProv also provides programmatic calls to query the provenance graph, given a node:
 
 * `get_node` takes any node ID and returns the tuple contents associated with the node
+* `get_code` takes any code definition string and stores it as an entity, then returns a unique ID
 * `get_annotations` returns a dictionary of key-value annotations associated with the node
 * `get_source_entities` takes an entity node and traces the `wasDerivedFrom` edge to find sources
 * `get_derived_entities` takes an entity node and traces back on the `wasDerivedFrom` edge to find derived nodes
@@ -80,10 +81,9 @@ the function invocation, its inputs, and its return values.
 The `MProvConnectionCache` allows us to do so.
 
 **Decorator syntax**.
-`@MProvAgg(`*input_stream*, *function_being_called*, *output_stream*, *input_unique_att*, *output_unique_att*, *parent_sub_stream*)
+`@MProvAgg(`*input_stream*, *output_stream*, *input_unique_att*, *output_unique_att*, *parent_sub_stream*)
 
 * `input_stream` is the name of the input stream or relation
-* `function_being_called` is a unique identifier for the operation being performed.  It could be the function name, but may also include a hash or other version-stamp info
 * `output_stream` is the name of the output stream or relation
 * `input_unique_att` and `output_unique_att` are used to determine a *unique key* for each element of the input and output streams, respectively.
 A monotonic timestamp is often used.

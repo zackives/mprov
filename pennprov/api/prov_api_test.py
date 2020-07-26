@@ -14,11 +14,11 @@ if mprov_conn:
 sub_stream_1 = mprov_conn.create_collection('sub_stream_1', 1)
 sub_stream_2 = mprov_conn.create_collection('sub_stream_2', 1)
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x','y'],['x','y'], sub_stream_1)
+@MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
 def test(n):
     return n.groupby('x').count()
 
-@MProvAgg("ecg", 'test', 'output_ecg',['x'],['x'], sub_stream_2)
+@MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
 def testx(n):
     return n.groupby('x').count()
 
