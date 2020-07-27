@@ -66,6 +66,7 @@ class GraphCache:
         self.edges_from[body.subject_id.local_part].append(inx)
         self.edges_to[body.object_id.local_part].append(inx)
         self._append(lambda: self.prov_dm_api.store_relation(resource, self.edges[inx][1], label))
+        self.flush()
 
     def get_connected_to(self, resource, token, label1):
         # type: (str, pennprov.QualifiedName, str) -> List[pennprov.ProvTokenSetModel]

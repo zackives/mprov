@@ -34,6 +34,8 @@ class MProvConnection:
     graph_name = "mProv-graph"
     default_host = "http://localhost:8088"
     cache = None
+    username = None
+    user_token = None
 
     def __init__(self, user, password, host=None):
         # type: (str, str, str) -> None
@@ -66,10 +68,12 @@ class MProvConnection:
     def create_or_reset_graph(self):
         self.prov_api.create_or_reset_provenance_graph(self.get_graph())
         self.cache = GraphCache(self.get_graph(), self.prov_api, self.prov_dm_api)
+        self.user_token = self.store_agent(self.username)
 
     def create_or_reuse_graph(self):
         self.prov_api.create_provenance_graph(self.get_graph())
         self.cache = GraphCache(self.get_graph(), self.prov_api, self.prov_dm_api)
+        self.user_token = self.store_agent(self.username)
 
     def get_graph(self):
         """
@@ -132,6 +136,12 @@ class MProvConnection:
         else:
             return eid
 
+    # Create a unique ID for an entity
+    @staticmethod
+    def get_agent_id(user):
+        # type: (str) -> str
+        return 'u_' + user
+
     # Create a unique ID for an activity (a stream operator call)
     @staticmethod
     def get_activity_id(operator, aid):
@@ -140,6 +150,20 @@ class MProvConnection:
             return operator + '._a' + str(aid)
         else:
             return 'a_' + operator
+
+    def store_agent(self, agent_name):
+        # type: (str) -> pennprov.QualifiedName
+
+        data = []
+        data.append(pennprov.Attribute(name=self._get_qname('uname'), value=agent_name, type='STRING'))
+
+        token = self.get_token_qname(self.get_agent_id(agent_name))
+        agent = pennprov.NodeModel(type='AGENT', attributes=data)
+        self.cache.store_node(resource=self.get_graph(),
+                              token=token, body=agent)
+        logging.debug('Storing AGENT %s' % str(token))
+
+        return token
 
     def store_activity(self,
                        activity,
@@ -158,6 +182,7 @@ class MProvConnection:
         """
         data = []
         data.append(pennprov.Attribute(name=self._get_qname('hash'), value=activity, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('agent'), value=self.username, type='STRING'))
 
         tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
         token = self.get_token_qname(self.get_activity_id(activity, location))
@@ -165,7 +190,15 @@ class MProvConnection:
                                       location=tok, start_time=start, end_time=end)
         self.cache.store_node(resource=self.get_graph(),
                               token=token, body=activity)
-        logging.debug('Storing ACTIVITY %s' % str(token))
+
+        data2 = []
+
+        data.append(pennprov.Attribute(name=pennprov.QualifiedName('prov', 'role'), value='loggedInUser', type='STRING'))
+        # Then we add a relationship edge (of type ANNOTATED)
+        association = pennprov.RelationModel(
+            type='ASSOCIATION', subject_id=token, object_id=self.user_token, attributes=data2)
+        self.cache.store_relation(resource=self.get_graph(), body=association, label='wasAssociatedWith')
+        logging.debug('Storing ACTIVITY %s with ASSOCIATION %s', str(token), str(self.user_token))
 
         return token
 
@@ -229,8 +262,9 @@ class MProvConnection:
 
         # Now we'll create a tuple within the provenance node, to capture the data
         data = []
-        data.append(pennprov.Attribute(name=self._get_qname('_prov'), value=token, type='STRING'))
-        data.append(pennprov.Attribute(name=self._get_qname('_code'), value=code, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('prov'), value=token, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('code'), value=code, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('type'), value='python3', type='STRING'))
 
         # Finally, we build an entity node within the graph, with the token and the
         # attributes
@@ -683,7 +717,7 @@ class MProvConnection:
             if len(code) > 0:
                 code_id  = code[0]['hash']
                 code = self.get_node(self.get_token_qname(code_id))
-                producers.append(code[1]['_code'])
+                producers.append(code[1]['code'])
 
         return producers
 
