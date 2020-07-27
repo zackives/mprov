@@ -53,10 +53,18 @@ class GraphCache:
     def store_relation(self, resource, body, label):
         # type: (str, pennprov.RelationModel, str) -> None
 
+        # This could be faster but is probably OK for low-degree graphs
+        # Suppress duplicates
+        for edge_id in self.edges_from[body.subject_id.local_part]:
+            edge = self.edges[edge_id]
+            if edge in self.edges_to[body.object_id.local_part] and edge[0] == label\
+                    and edge[1] == body:
+                return
+
         inx = len(self.edges)
         self.edges.append((label, body))
         self.edges_from[body.subject_id.local_part].append(inx)
-        self.edges_to[body.subject_id.local_part].append(inx)
+        self.edges_to[body.object_id.local_part].append(inx)
         self._append(lambda: self.prov_dm_api.store_relation(resource, self.edges[inx][1], label))
 
     def get_connected_to(self, resource, token, label1):

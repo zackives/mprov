@@ -117,19 +117,22 @@ class MProvConnection:
         if eid:
             return stream + '._e' + str(eid)
         else:
-            return '_' + stream
+            return 'e_' + stream
 
     # Create a unique ID for an activity (a stream operator call)
     @staticmethod
     def get_activity_id(operator, aid):
         # type: (str, Any) -> str
-        return operator + '._a' + str(aid)
+        if aid:
+            return operator + '._a' + str(aid)
+        else:
+            return 'a_' + operator
 
     def store_activity(self,
                        activity,
                        start,
                        end,
-                       location):
+                       location: None):
         # type: (str, int, int, int) -> pennprov.QualifiedName
         """
         Create an entity node for an activity (a stream operator computation)
@@ -459,7 +462,7 @@ class MProvConnection:
             type='GENERATION', subject_id=result_token, object_id=activity_token, attributes=[])
         self.cache.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
 
-        return window_token
+        return result_token
 
     def get_qname(self, local_part):
         # types: (str) -> pennprov.QualifiedName
@@ -478,7 +481,7 @@ class MProvConnection:
         :param token:
         :return:
         """
-        if len(token) > 20:
+        if len(token) > 40:
             thash = hashlib.sha1(token.encode('utf-8'))
             return self.get_qname(thash.hexdigest())
         else:

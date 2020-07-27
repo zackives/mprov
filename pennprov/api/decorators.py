@@ -2,6 +2,7 @@ import logging
 from datetime import timezone, datetime
 from functools import wraps
 
+from pennprov import RelationModel
 from pennprov.connection.mprov_connection import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
@@ -52,6 +53,18 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
         else:
             return repr(stream)
 
+    def _write_collection_relationships(mprov_conn, sig, derived, source):
+        mprov_conn.store_derived_from(derived, source)
+        activity_token = mprov_conn.store_activity(sig, None, None, None)
+
+        uses = RelationModel(
+            type='USAGE', subject_id=activity_token, object_id=source, attributes=[])
+        mprov_conn.cache.store_relation(resource=mprov_conn.get_graph(), body=uses, label='used')
+
+        generates = RelationModel(
+            type='GENERATION', subject_id=derived, object_id=activity_token, attributes=[])
+        mprov_conn.cache.store_relation(resource=mprov_conn.get_graph(), body=generates, label='wasGeneratedBy')
+
     def inner_function(func):
         @wraps(func)
         def wrapper(arg):
@@ -74,6 +87,7 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
 
             sig = stored[func.__name__]
 
+            # Create a window with the appropriate keys
             window_ids = []
             for t in rel_keys(arg, in_stream_key):
                 if mprov_conn:
@@ -94,25 +108,39 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
 
             ts = datetime.now(timezone.utc)
             if mprov_conn:
-                #try:
-                for t in rel_keys(arg, in_stream_key):
-                    #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
-                    tup = mprov_conn.store_stream_tuple(in_stream_name, [t[k] for k in in_stream_key], blank_tuple)
+                try:
+                    for t in rel_keys(arg, in_stream_key):
+                        #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
 
-                    if out_stream_name not in stored:
-                        stream_part = mprov_conn.create_collection(out_stream_name)
-                        stored[out_stream_name] = stream_part.local_part
-                    else:
-                        stream_part = mprov_conn.get_qname(stored[out_stream_name])
-                    mprov_conn.add_to_collection(tup, stream_part)
+                        # This ensures that the input tuples actually exist.  It needs to merge
+                        # if the tuple is already there
+                        tup = mprov_conn.store_stream_tuple(in_stream_name,
+                                                            [t[k] for k in in_stream_key], blank_tuple)
 
-                    if collection:
-                        mprov_conn.add_to_collection(tup, collection)
-                #except:
-                #    pass
+                        # Ensure that the input tuples are also linked to the appropriate stream
+                        if in_stream_name not in stored:
+                            stream_part = mprov_conn.create_collection(in_stream_name)
+                            stored[in_stream_name] = stream_part.local_part
+                        else:
+                            stream_part = mprov_conn.get_qname(stored[in_stream_name])
+                        mprov_conn.add_to_collection(tup, stream_part)
+                except:
+                    pass
                 #print (window_ids)
-                mprov_conn.store_windowed_result(out_stream_name, 'w'+str(out_keys), blank_tuple,
+                result = mprov_conn.store_windowed_result(out_stream_name, 'w'+str(out_keys), blank_tuple,
                                                  window_ids, sig, ts, ts)
+                if out_stream_name not in stored:
+                    stream_part = mprov_conn.create_collection(out_stream_name)
+                    stored[out_stream_name] = stream_part.local_part
+
+                    # Add derivation to source input
+                    _write_collection_relationships(mprov_conn, sig, stream_part, mprov_conn.get_qname(stored[in_stream_name]))
+                else:
+                    stream_part = mprov_conn.get_qname(stored[out_stream_name])
+                mprov_conn.add_to_collection(result, stream_part)
+
+                if collection:
+                    mprov_conn.add_to_collection(result, collection)
             else:
                 logging.warning("Output: %s.%s <(%s)- %s", out_stream_name, 'w'+str(out_keys), sig, str(window_ids))
 
