@@ -122,7 +122,7 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
                             stream_part = mprov_conn.create_collection(in_stream_name)
                             stored[in_stream_name] = stream_part.local_part
                         else:
-                            stream_part = mprov_conn.get_qname(stored[in_stream_name])
+                            stream_part = mprov_conn.get_token_qname(stored[in_stream_name])
                         mprov_conn.add_to_collection(tup, stream_part)
                 except:
                     pass
@@ -134,9 +134,9 @@ def MProvAgg(in_stream_name,out_stream_name,in_stream_key=['index'],out_stream_k
                     stored[out_stream_name] = stream_part.local_part
 
                     # Add derivation to source input
-                    _write_collection_relationships(mprov_conn, sig, stream_part, mprov_conn.get_qname(stored[in_stream_name]))
+                    _write_collection_relationships(mprov_conn, sig, stream_part, mprov_conn.get_token_qname(stored[in_stream_name]))
                 else:
-                    stream_part = mprov_conn.get_qname(stored[out_stream_name])
+                    stream_part = mprov_conn.get_token_qname(stored[out_stream_name])
                 mprov_conn.add_to_collection(result, stream_part)
 
                 if collection:

@@ -119,6 +119,19 @@ class MProvConnection:
         else:
             return 'e_' + stream
 
+    @staticmethod
+    def get_stream_from_entity_id(eid):
+        # type: (str) -> str
+        if isinstance(eid, pennprov.QualifiedName):
+            eid = eid.local_part
+
+        if '._e' in eid:
+            return eid[eid.index('._e')+3:]
+        elif eid.startswith('e_'):
+            return eid[2:]
+        else:
+            return eid
+
     # Create a unique ID for an activity (a stream operator call)
     @staticmethod
     def get_activity_id(operator, aid):
@@ -132,7 +145,7 @@ class MProvConnection:
                        activity,
                        start,
                        end,
-                       location: None):
+                       location= None):
         # type: (str, int, int, int) -> pennprov.QualifiedName
         """
         Create an entity node for an activity (a stream operator computation)
@@ -144,6 +157,7 @@ class MProvConnection:
         :return:
         """
         data = []
+        data.append(pennprov.Attribute(name=self._get_qname('hash'), value=activity, type='STRING'))
 
         tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
         token = self.get_token_qname(self.get_activity_id(activity, location))
@@ -183,7 +197,7 @@ class MProvConnection:
         # Now we'll create a tuple within the provenance node, to capture the data
         data = []
         for i, k in enumerate(input_tuple.schema.fields):
-            qkey = self.get_qname(k)
+            qkey = self.get_token_qname(k)
             data.append(pennprov.Attribute(name=qkey, value=input_tuple[k], type='STRING'))
 
         # Finally, we build an entity node within the graph, with the token and the
@@ -215,8 +229,8 @@ class MProvConnection:
 
         # Now we'll create a tuple within the provenance node, to capture the data
         data = []
-        data.append(pennprov.Attribute(name=self.get_qname('_prov'), value=token, type='STRING'))
-        data.append(pennprov.Attribute(name=self.get_qname('_code'), value=code, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('_prov'), value=token, type='STRING'))
+        data.append(pennprov.Attribute(name=self._get_qname('_code'), value=code, type='STRING'))
 
         # Finally, we build an entity node within the graph, with the token and the
         # attributes
@@ -248,7 +262,7 @@ class MProvConnection:
 
             # The key/value pair will itself be an entity node
             attributes = [
-                pennprov.Attribute(name=self.get_qname(k), value=annotation_dict[k],
+                pennprov.Attribute(name=self.get_token_qname(k), value=annotation_dict[k],
                                    type='STRING')]
             self._write_annot(ann_token, node_token, attributes)
 
@@ -288,7 +302,7 @@ class MProvConnection:
 
         # The key/value pair will itself be an entity node
         attributes = [
-            pennprov.Attribute(name=self.get_qname(annotation_name), value=annotation_value,
+            pennprov.Attribute(name=self.get_token_qname(annotation_name), value=annotation_value,
                                type='STRING')]
         self._write_annot(ann_token, node_token, attributes)
 
@@ -464,7 +478,7 @@ class MProvConnection:
 
         return result_token
 
-    def get_qname(self, local_part):
+    def _get_qname(self, local_part):
         # types: (str) -> pennprov.QualifiedName
         """
         Returns a qualified name from a string to be used as the local part
@@ -483,9 +497,9 @@ class MProvConnection:
         """
         if len(token) > 40:
             thash = hashlib.sha1(token.encode('utf-8'))
-            return self.get_qname(thash.hexdigest())
+            return self._get_qname(thash.hexdigest())
         else:
-            return self.get_qname(token)
+            return self._get_qname(token)
 
     @classmethod
     def parse_qname(cls, token_value):
@@ -648,6 +662,30 @@ class MProvConnection:
     # def get_entity_and_ancestor_annotations(self, entity_id):
     #     # type: (pennprov.QualifiedName) -> dict
     #     return
+
+    def get_stream_inputs(self, stream_name):
+        inputs = []
+
+        stream_node = self.get_token_qname(self.get_entity_id(stream_name))
+
+        for node in self.get_source_entities(stream_node):
+            inputs.append(self.get_stream_from_entity_id(node.local_part))
+
+        return inputs
+
+    def get_stream_producers(self, stream_name):
+        producers = []
+        stream_node = self.get_token_qname(self.get_entity_id(stream_name))
+
+        for node in self.get_creating_activities(stream_node):
+            code = self.get_node(node)
+
+            if len(code) > 0:
+                code_id  = code[0]['hash']
+                code = self.get_node(self.get_token_qname(code_id))
+                producers.append(code[1]['_code'])
+
+        return producers
 
     def flush(self):
         self.cache.flush()
