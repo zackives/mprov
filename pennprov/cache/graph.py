@@ -17,9 +17,6 @@ import cachetools
 
 class GraphCache:
     graph_name = ''
-    edges = []
-    edges_from = {}
-    edges_to = {}
     prov_api = None
     prov_dm_api = None
     local_only = True
@@ -35,6 +32,8 @@ class GraphCache:
         self.prov_api = prov_api
         self.prov_dm_api = prov_dm_api
         self.nodes = cachetools.TTLCache(10000, ttl_seconds)
+        # (subject_id.local_part, label, object_id.local_part) -> RelationModel
+        self.edges = cachetools.TTLCache(10000, ttl_seconds)
         self.prov_data = cachetools.TTLCache(10000, ttl_seconds)
         # (subject_id.local_part, label) -> List[object_id]
         self.connected_from = cachetools.TTLCache(10000, ttl_seconds)
@@ -52,24 +51,17 @@ class GraphCache:
 
         if token.local_part not in self.nodes:
             self.nodes[token.local_part] = body
-            self.edges_from[token.local_part] = []
-            self.edges_to[token.local_part] = []
             self._append(lambda: self.prov_dm_api.store_node(resource, token, self.nodes[token.local_part]))
         return token
 
     def store_relation(self, resource, body, label):
         # type: (str, pennprov.RelationModel, str) -> None
+        edge_key = (body.subject_id.local_part, label, body.object_id.local_part)
 
-        # This could be faster but is probably OK for low-degree graphs
-        # Suppress duplicates
-        for edge_id in self.edges_from[body.subject_id.local_part]:
-            edge = self.edges[edge_id]
-            if edge in self.edges_to[body.object_id.local_part] and edge[0] == label\
-                    and edge[1] == body:
-                return
+        if edge_key in self.edges:
+            return
 
-        inx = len(self.edges)
-        self.edges.append((label, body))
+        self.edges[edge_key] = body
         
         connected_from_key = (body.subject_id.local_part, label)
         connected_from = self.connected_from.get(connected_from_key)
@@ -85,9 +77,7 @@ class GraphCache:
             self.connected_to[connected_to_key] = connected_to
         connected_to.append(body.subject_id)
 
-        self.edges_from[body.subject_id.local_part].append(inx)
-        self.edges_to[body.object_id.local_part].append(inx)
-        self._append(lambda: self.prov_dm_api.store_relation(resource, self.edges[inx][1], label))
+        self._append(lambda: self.prov_dm_api.store_relation(resource, self.edges[edge_key], label))
         self.flush()
 
     def get_connected_to(self, resource, token, label1):
