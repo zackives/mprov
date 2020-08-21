@@ -27,7 +27,8 @@ REQUIRES = [
     "python-dateutil>=2.1",
     "six>=1.10",
     "urllib3>=1.23",
-    "pandas>=1.0"
+    "pandas>=1.0",
+    "cachetools>=4.1"
 ]
     
 

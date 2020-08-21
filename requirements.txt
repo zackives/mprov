@@ -5,3 +5,5 @@ setuptools >= 21.0.0
 urllib3 >= 1.15.1
 pandas >= 1.0.1
 sqlparse >= 0.3.1
+cachetools >= 4.1
+
