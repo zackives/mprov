@@ -127,3 +127,4 @@ class GraphCache:
 
     def close(self):
         self.flush()
+        
