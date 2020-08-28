@@ -19,27 +19,27 @@ class GraphCache:
     graph_name = ''
     prov_api = None
     prov_dm_api = None
-    local_only = True
 
     MAX = 10000
 
     pending_writes = []
 
-    def __init__(self, graph, prov_api, prov_dm_api, ttl_seconds=10):
+    def __init__(self, graph, prov_api, prov_dm_api, ttl_seconds=2, max_cache_size=None):
         # type: (str, pennprov.ProvenanceApi, pennprov.ProvDmApi, int) -> None
-
+        maxsize = max_cache_size or float('inf')
         self.graph_name = graph
         self.prov_api = prov_api
         self.prov_dm_api = prov_dm_api
-        self.nodes = cachetools.TTLCache(10000, ttl_seconds)
+        # node_id.local_part -> NodeModel
+        self.nodes = cachetools.TTLCache(maxsize=maxsize, ttl=ttl_seconds)
         # (subject_id.local_part, label, object_id.local_part) -> RelationModel
-        self.edges = cachetools.TTLCache(10000, ttl_seconds)
-        self.prov_data = cachetools.TTLCache(10000, ttl_seconds)
+        self.edges = cachetools.TTLCache(maxsize=maxsize, ttl=ttl_seconds)
+        # node_id.local_part -> List[Dict]
+        self.prov_data = cachetools.TTLCache(maxsize=maxsize, ttl=ttl_seconds)
         # (subject_id.local_part, label) -> List[object_id]
-        self.connected_from = cachetools.TTLCache(10000, ttl_seconds)
-
+        self.connected_from = cachetools.TTLCache(maxsize=maxsize, ttl=ttl_seconds)
         # (object_id.local_part, label) -> List[subject_id]
-        self.connected_to = cachetools.TTLCache(10000, ttl_seconds)
+        self.connected_to = cachetools.TTLCache(maxsize=maxsize, ttl=ttl_seconds)
 
     def _append(self, item):
         self.pending_writes.append(item)
@@ -124,7 +124,6 @@ class GraphCache:
         for fn in self.pending_writes:
             fn()
         self.pending_writes = []
-        self.local_only = False
 
     def close(self):
         self.flush()
