@@ -53,6 +53,7 @@ class MProvConnection:
         self.prov_api = pennprov.ProvenanceApi(api_client)
         self.prov_dm_api = pennprov.ProvDmApi(api_client)
         self.username = user
+        self.user_token = self.get_agent_token(self.username)
         credentials = pennprov.UserCredentials(password)
         self.cache = GraphCache(self.get_graph(), self.prov_api, self.prov_dm_api)
 
@@ -69,11 +70,13 @@ class MProvConnection:
         self.prov_api.create_or_reset_provenance_graph(self.get_graph())
         self.cache = GraphCache(self.get_graph(), self.prov_api, self.prov_dm_api)
         self.user_token = self.store_agent(self.username)
+        self.flush()
 
     def create_or_reuse_graph(self):
         self.prov_api.create_provenance_graph(self.get_graph())
         self.cache = GraphCache(self.get_graph(), self.prov_api, self.prov_dm_api)
         self.user_token = self.store_agent(self.username)
+        self.flush()
 
     def get_graph(self):
         """
@@ -151,19 +154,22 @@ class MProvConnection:
         else:
             return 'a_' + operator
 
+    def get_agent_token(self, agent_name):
+        # type (str) -> pennprov.QualifiedName
+        return  self.get_token_qname(self.get_agent_id(agent_name))
+
     def store_agent(self, agent_name):
         # type: (str) -> pennprov.QualifiedName
 
         data = []
         data.append(pennprov.Attribute(name=self._get_qname('uname'), value=agent_name, type='STRING'))
 
-        token = self.get_token_qname(self.get_agent_id(agent_name))
         agent = pennprov.NodeModel(type='AGENT', attributes=data)
         self.cache.store_node(resource=self.get_graph(),
-                              token=token, body=agent)
-        logging.debug('Storing AGENT %s' % str(token))
+                              token=self.user_token, body=agent)
+        logging.debug('Storing AGENT %s' % str(self.user_token))
 
-        return token
+        return self.user_token
 
     def store_activity(self,
                        activity,
