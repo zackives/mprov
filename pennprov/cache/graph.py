@@ -51,7 +51,7 @@ class GraphCache:
 
         if token.local_part not in self.nodes:
             self.nodes[token.local_part] = body
-            self._append(lambda: self.prov_dm_api.store_node(resource, token, self.nodes[token.local_part]))
+            self._append(lambda: self.prov_dm_api.store_node(resource, token, body))
         return token
 
     def store_relation(self, resource, body, label):
@@ -77,7 +77,7 @@ class GraphCache:
             self.connected_to[connected_to_key] = connected_to
         connected_to.append(body.subject_id)
 
-        self._append(lambda: self.prov_dm_api.store_relation(resource, self.edges[edge_key], label))
+        self._append(lambda: self.prov_dm_api.store_relation(resource, body, label))
         self.flush()
 
     def get_connected_to(self, resource, token, label1):
