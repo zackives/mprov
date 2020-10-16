@@ -36,6 +36,11 @@ class MProvAgg:
         self.collection = collection
         self.connection_key = connection_key or MProvConnectionCache.Key()
 
+        # For Spark. Flush anything created on the driver node prior to computation.
+        mprov_conn = MProvConnectionCache.get_connection(self.connection_key);
+        if mprov_conn:
+            mprov_conn.flush()
+
     def md_key(self, stream, key_list):
         if isinstance(stream, tuple) and len(stream) == 1:
             stream = stream[0]
