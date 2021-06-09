@@ -1,0 +1,12 @@
+dbms:
+ host: localhost
+ graph_db: postgres
+ auth_db: habitat_security
+ user: postgres
+ password: habitat1
+
+provenance:
+ graph: mProv-graph
+ user: YOUR_USERNAME2
+ password: YOUR_PASSWORD
+

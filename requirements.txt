@@ -6,4 +6,7 @@ urllib3 >= 1.15.1
 pandas >= 1.0.1
 sqlparse >= 0.3.1
 cachetools >= 4.1
-
+omegaconf >= 2.1
+psycopg2 >= 2.8.6
+pytest >= 6.2.4
+pyspark >= 3.0.0

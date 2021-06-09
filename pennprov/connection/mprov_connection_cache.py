@@ -17,6 +17,7 @@ import os
 import logging
 from pennprov.connection.mprov_connection import MProvConnection
 from urllib3.exceptions import NewConnectionError
+from pennprov.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +49,15 @@ class MProvConnectionCache:
             """
             self.graph = graph
             self.user = user or os.environ.get('MPROV_USER')
+            if self.user is None:
+                self.user = config.dbms.user
             self.password = password or os.environ.get('MPROV_PASSWORD')
+            if self.password is None:
+                self.password = config.dbms.password
             self.host = host or os.environ.get(
                 'MPROV_HOST', MProvConnection.default_host)
+            if self.host is None:
+                self.host = config.dbms.host
             if not self.user:
                 raise ValueError(
                     'either supply user or set environment variable MPROV_USER')
