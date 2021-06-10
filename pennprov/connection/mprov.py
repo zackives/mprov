@@ -60,9 +60,6 @@ class MProvConnection:
 
         self.user_token = self.get_username()
 
-        print(self.graph_conn)
-        print(self.auth_conn)
-
         self._create_tables()
         self.graph_name = config.provenance.graph
         return
@@ -236,7 +233,6 @@ class MProvConnection:
             dk = hashlib.pbkdf2_hmac('sha256', (operator+aid).encode('utf-8'), b'prov', 20)
 
             stream = binascii.hexlify(dk).decode('utf-8')
-            print(stream)
 
             return stream#operator + '._a' + str(aid)
         else:
@@ -389,8 +385,6 @@ class MProvConnection:
 
         logging.debug('Storing ENTITY ' + str(token))
 
-        print('Stored tuple %s'%token)
-
         return token
 
     def store_code(self, code):
@@ -439,7 +433,7 @@ class MProvConnection:
         ann_tokens = []
 
         for k in annotation_dict.keys():
-            ann_token = self.get_token_qname(node_token.local_part + "." + k)
+            ann_token = self.get_token_qname(MProvConnection.parse_qname(node_token).local_part + "." + k)
             ann_tokens.append(ann_token)
 
             # The key/value pair will itself be an entity node
@@ -636,8 +630,6 @@ class MProvConnection:
         :param end: End time
         :return:
         """
-        print('Input tokens', input_tokens_list)
-
         result_token = self.store_stream_tuple(output_stream_name, output_stream_index, output_tuple)
         window_token = self.store_window_and_inputs(output_stream_name, output_stream_index, input_tokens_list)
 
@@ -834,7 +826,7 @@ class MProvConnection:
         stream_node = self.get_token_qname(self.get_entity_id(stream_name))
 
         for node in self.get_source_entities(stream_node):
-            inputs.append(self.get_stream_from_entity_id(node.local_part))
+            inputs.append(self.get_stream_from_entity_id(MProvConnection.parse_qname(node).local_part))
 
         return inputs
 

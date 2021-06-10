@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 from datetime import timezone, datetime
 from functools import wraps
 
@@ -133,12 +134,14 @@ class MProvAgg:
                         # Ensure that the input tuples are also linked to the appropriate stream
                         if self.in_stream_name not in stored:
                             stream_part = mprov_conn.create_collection(self.in_stream_name)
-                            stored[self.in_stream_name] = stream_part.local_part
+                            stored[self.in_stream_name] = MProvConnection.parse_qname(stream_part).local_part
                         else:
                             stream_part = mprov_conn.get_token_qname(stored[self.in_stream_name])
                         mprov_conn.add_to_collection(tup, stream_part)
                 except:
+                    print('Error')
                     print(sys.exc_info()[0])
+                    traceback.print_exc()
                     pass
                 #print (window_ids)
                 result = mprov_conn.store_windowed_result(self.out_stream_name, 'w'+str(out_keys), blank_tuple,
