@@ -134,7 +134,7 @@ class MProvAgg:
                         # Ensure that the input tuples are also linked to the appropriate stream
                         if self.in_stream_name not in stored:
                             stream_part = mprov_conn.create_collection(self.in_stream_name)
-                            stored[self.in_stream_name] = MProvConnection.parse_qname(stream_part).local_part
+                            stored[self.in_stream_name] = MProvConnection.get_local_part(stream_part)
                         else:
                             stream_part = mprov_conn.get_token_qname(stored[self.in_stream_name])
                         mprov_conn.add_to_collection(tup, stream_part)
@@ -148,7 +148,7 @@ class MProvAgg:
                                                  window_ids, sig, ts, ts)
                 if self.out_stream_name not in stored:
                     stream_part = mprov_conn.create_collection(self.out_stream_name)
-                    stored[self.out_stream_name] = MProvConnection.parse_qname(stream_part).local_part
+                    stored[self.out_stream_name] = MProvConnection.get_local_part(stream_part)
 
                     # Add derivation to source input
                     self._write_collection_relationships(mprov_conn, sig, stream_part, mprov_conn.get_token_qname(stored[self.in_stream_name]))

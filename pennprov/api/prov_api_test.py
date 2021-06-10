@@ -54,7 +54,7 @@ print (str(derived_list))
 # Take a source (window) and see if we can read it
 source_node = mprov_conn.get_node(source_list[0])
 print (str(source_node))
-assert (len(source_node) == 1 and source_node[0]['type'] == 'QUALIFIED_NAME')
+assert (len(source_node) == 1)# and source_node[0]['type'] == 'QUALIFIED_NAME')
 # and trace to the input tuples
 tuples_list = mprov_conn.get_child_entities(source_list[0])
 assert (len(tuples_list) == 2)
@@ -69,7 +69,7 @@ print (str(gen))
 
 input_windows = mprov_conn.get_activity_inputs(activity[0])
 assert (len(input_windows) == 1)
-assert (input_windows[0].local_part == "output_ecg_w.w[[1, 1], [3, 1]]")
+assert (MProvConnection.get_local_part(input_windows[0]) == "output_ecg_w.w[[1, 1], [3, 1]]")
 print (str(input_windows))
 
 mprov_conn.store_annotations(gen[0], {'first': 'value', 'second':0})
@@ -77,7 +77,7 @@ mprov_conn.store_annotations(gen[0], {'first': 'value', 'second':0})
 mprov_conn.flush()
 ann = mprov_conn.get_annotations(gen[0])
 assert (len(ann) == 2)
-print ("Annotations on %s: %s" %(str(gen[0].local_part), str(ann)))
+print ("Annotations on %s: %s" %(str(MProvConnection.get_local_part(gen[0])), str(ann)))
 
 assert (mprov_conn.get_stream_inputs("output_ecg")[0] == "ecg")
 

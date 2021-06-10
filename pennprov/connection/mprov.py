@@ -210,7 +210,7 @@ class MProvConnection:
     def get_stream_from_entity_id(eid):
         # type: (str) -> str
         if eid.startswith('{'):
-            eid = MProvConnection.parse_qname(eid).local_part
+            eid = MProvConnection.get_local_part(eid)
 
         if '._e' in eid:
             return eid[eid.index('._e')+3:]
@@ -433,7 +433,7 @@ class MProvConnection:
         ann_tokens = []
 
         for k in annotation_dict.keys():
-            ann_token = self.get_token_qname(MProvConnection.parse_qname(node_token).local_part + "." + k)
+            ann_token = self.get_token_qname(MProvConnection.get_local_part(node_token) + "." + k)
             ann_tokens.append(ann_token)
 
             # The key/value pair will itself be an entity node
@@ -447,12 +447,13 @@ class MProvConnection:
             with conn.cursor() as cursor:
                 cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
                     (ann_token,self.get_graph()))
-
-                self._write_tuple(cursor, self.get_graph(), ann_token, attributes)
-
                 # Then we add a relationship edge (of type ANNOTATED)
                 cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'_annotated') ON CONFLICT DO NOTHING", \
                     (self.get_graph(),ann_token,node_token))
+                print('Wrote ANNOT edge %s'%ann_token)
+
+                # Write the annotation tuple
+                self._write_tuple(cursor, self.get_graph(), ann_token, attributes)
 
 
     def store_annotation(self,
@@ -826,7 +827,7 @@ class MProvConnection:
         stream_node = self.get_token_qname(self.get_entity_id(stream_name))
 
         for node in self.get_source_entities(stream_node):
-            inputs.append(self.get_stream_from_entity_id(MProvConnection.parse_qname(node).local_part))
+            inputs.append(self.get_stream_from_entity_id(MProvConnection.get_local_part(node)))
 
         return inputs
 
@@ -857,6 +858,19 @@ class MProvConnection:
             raise ValueError('cannot parse as QualfiedName:', token_value)
         qname = pennprov.QualifiedName(namespace=match.group(1), local_part=match.group(2))
         return qname
+
+    @classmethod
+    def get_local_part(cls, token_value):
+        # types (str) -> pennprov.QualifiedName
+        """
+        Returns a QualifiedName by parsing the given string as a namespace and local part
+        :param token_value: a string of the form '{' + namespace + '}' + local_part
+        :return: the corresponding pennprov.QualifiedName
+        """
+        match = cls.QNAME_REGEX.match(token_value)
+        if not match:
+            raise ValueError('cannot parse as QualfiedName:', token_value)
+        return match.group(2)
 
     def get_provenance_data(self, resource, token):
         # type: (str, str) -> List[Dict]
