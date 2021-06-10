@@ -1,5 +1,6 @@
 import logging
 
+from pennprov.connection.mprov import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.api.decorators import MProvAgg
 
@@ -39,7 +40,7 @@ df = ecg
 
 id = mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]'))
 node = mprov_conn.get_node(id)
-print ("Output ECG node %s is %s" %(id.local_part, node))
+print ("Output ECG node %s is %s" %(MProvConnection.parse_qname(id).local_part, node))
 
 # What are the sources for a given output ECG (these should be windows)
 source_list = mprov_conn.get_source_entities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))

@@ -858,6 +858,41 @@ class MProvConnection:
         qname = pennprov.QualifiedName(namespace=match.group(1), local_part=match.group(2))
         return qname
 
+    def get_provenance_data(self, resource, token):
+        # type: (str, str) -> List[Dict]
+        res = {}
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT index,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue FROM MProv_NodeProp WHERE _resource = (%s) AND _key = (%s) AND index IS NOT NULL", (resource,token))
+
+                print ("Results:", token, cursor.fetchall())
+
+        return [res]
+
+    def get_connected_to(self, resource, token, label1):
+        # type: (str, str, str) -> List[pennprov.ProvTokenSetModel]
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                if label1 is None:
+                    cursor.execute("SELECT _from FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s)", (resource,token))
+                else:
+                    cursor.execute("SELECT _from FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s) AND label = (%s)",
+                                   (self.get_graph(), token, label1))
+                return [x[0] for x in cursor.fetchall()]
+        return []
+
+    def get_connected_from(self, resource, token, label1):
+        # type: (str, str, str) -> List[pennprov.ProvTokenSetModel]
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                if label1 is None:
+                    cursor.execute("SELECT _to FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s)", (resource,token))
+                else:
+                    cursor.execute("SELECT _to FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s) AND label = (%s)",
+                                   (self.get_graph(), token, label1))
+                return [x[0] for x in cursor.fetchall()]
+        return []
+
     def flush(self):
         return
 
