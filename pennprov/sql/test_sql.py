@@ -1,4 +1,4 @@
-from pennprov.sql.mprov import SqlProvenance
+from pennprov.sql.sql_prov import SqlProvenance
 import logging
 
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
@@ -11,6 +11,8 @@ connection_key = MProvConnectionCache.Key()
 mprov_conn = MProvConnectionCache.get_connection(connection_key)
 if mprov_conn:
     mprov_conn.create_or_reset_graph()
+else:
+    raise RuntimeError('Could not connect')
 
 
 def simple_query():

@@ -1,9 +1,10 @@
 import logging
+import sys
 from datetime import timezone, datetime
 from functools import wraps
 
 from pennprov import RelationModel
-from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 import pandas as pd
@@ -70,13 +71,8 @@ class MProvAgg:
         mprov_conn.store_derived_from(derived, source)
         activity_token = mprov_conn.store_activity(sig, None, None, None)
 
-        uses = RelationModel(
-            type='USAGE', subject_id=activity_token, object_id=source, attributes=[])
-        mprov_conn.cache.store_relation(resource=mprov_conn.get_graph(), body=uses, label='used')
-
-        generates = RelationModel(
-            type='GENERATION', subject_id=derived, object_id=activity_token, attributes=[])
-        mprov_conn.cache.store_relation(resource=mprov_conn.get_graph(), body=generates, label='wasGeneratedBy')
+        mprov_conn.store_used(activity_token, source)
+        mprov_conn.store_generated_by(derived, activity_token)
 
     def __call__(self, func):
         global stored
@@ -108,11 +104,8 @@ class MProvAgg:
 
             # Create a window with the appropriate keys
             window_ids = []
-            for t in self.rel_keys(arg, self.in_stream_key):
-                if mprov_conn:
-                    window_ids.append(get_entity_id(self.in_stream_name, [t[k] for k in self.in_stream_key]))
-                else:
-                    window_ids.append(get_entity_id(self.in_stream_name, [t[k] for k in self.in_stream_key]))
+            #for t in self.rel_keys(arg, self.in_stream_key):
+            #    window_ids.append(get_entity_id(self.in_stream_name, [t[k] for k in self.in_stream_key]))
 
             if isinstance(self.out_stream_key,list):
                 if len(self.out_stream_key) == 1:
@@ -129,7 +122,8 @@ class MProvAgg:
             if mprov_conn:
                 try:
                     for t in self.rel_keys(arg, self.in_stream_key):
-                        #print('Input: %s' %in_stream_name + str([t[k] for k in in_stream_key]))
+                        #print('Input: %s' %self.in_stream_name + str([t[k] for k in self.in_stream_key]))
+                        window_ids.append(get_entity_id(self.in_stream_name, [t[k] for k in self.in_stream_key]))
 
                         # This ensures that the input tuples actually exist.  It needs to merge
                         # if the tuple is already there
@@ -144,13 +138,14 @@ class MProvAgg:
                             stream_part = mprov_conn.get_token_qname(stored[self.in_stream_name])
                         mprov_conn.add_to_collection(tup, stream_part)
                 except:
+                    print(sys.exc_info()[0])
                     pass
                 #print (window_ids)
                 result = mprov_conn.store_windowed_result(self.out_stream_name, 'w'+str(out_keys), blank_tuple,
                                                  window_ids, sig, ts, ts)
                 if self.out_stream_name not in stored:
                     stream_part = mprov_conn.create_collection(self.out_stream_name)
-                    stored[self.out_stream_name] = stream_part.local_part
+                    stored[self.out_stream_name] = MProvConnection.parse_qname(stream_part).local_part
 
                     # Add derivation to source input
                     self._write_collection_relationships(mprov_conn, sig, stream_part, mprov_conn.get_token_qname(stored[self.in_stream_name]))

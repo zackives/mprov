@@ -1,5 +1,5 @@
 import pennprov
-from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov import MProvConnection
 import hashlib, binascii
 import sqlparse
 import pyspark

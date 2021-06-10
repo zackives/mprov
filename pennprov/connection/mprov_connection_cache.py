@@ -15,7 +15,7 @@
 '''
 import os
 import logging
-from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov import MProvConnection
 from urllib3.exceptions import NewConnectionError
 from pennprov.config import config
 
@@ -47,7 +47,10 @@ class MProvConnectionCache:
             :raises:         ValueError if user is None and MPROV_USER is not set
                              or if password is None and MPROV_PASSWORD is not set
             """
-            self.graph = graph
+            if graph is not None:
+                self.graph = graph
+            else:
+                self.graph = config.provenance.graph
             self.user = user or os.environ.get('MPROV_USER')
             if self.user is None:
                 self.user = config.dbms.user

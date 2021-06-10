@@ -10,9 +10,14 @@ class TestMProv:
         self.conn = mprov.MProvConnection()
         assert self.conn is not None
 
-    def test_init_graph(self):
         self.conn.create_or_reset_graph()
         self.conn.create_or_reuse_graph()
+
+        self.conn.store_stream_tuple('first_stream', 0, {'start': 1, 'end': 2})
+        self.conn.store_annotation('first_stream', 0, 'ann1', 30)
+
+        self.conn.store_activity('area_circle', 0, 1, 0)
+        self.conn.store_code('import pytest\nimport logging\n')
 
 
 

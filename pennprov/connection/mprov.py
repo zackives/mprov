@@ -18,6 +18,7 @@ import binascii
 import logging
 import re
 import pennprov
+import datetime
 from pennprov.metadata.stream_metadata import BasicTuple
 
 #from pennprov.cache.graph import GraphCache
@@ -28,6 +29,9 @@ from pennprov.config import config
 class MProvConnection:
     cache = None
     graph_name = None
+    namespace = 'http://mprov.md2k.org'
+    default_host = "localhost"
+    QNAME_REGEX = re.compile('{([^}]*)}(.*)')
 
     """
     MProvConnection is a high-level API to the PennProvenance framework, with
@@ -53,6 +57,8 @@ class MProvConnection:
 
         self.auth_conn = psycopg2.connect(host=host, database=config.dbms.auth_db, user=user, password=password)
         self.graph_conn = psycopg2.connect(host=host, database=config.dbms.graph_db, user=user, password=password)
+
+        self.user_token = self.get_username()
 
         print(self.graph_conn)
         print(self.auth_conn)
@@ -86,6 +92,7 @@ class MProvConnection:
                                                            dvalue DOUBLE PRECISION,
                                                            fvalue REAL,
                                                            tvalue DATE,
+                                                           tsvalue TIMESTAMP,
                                                            index BIGINT,
                                                            PRIMARY KEY(_resource, _key, label),
                                                            UNIQUE(_resource,_key,index),
@@ -120,6 +127,7 @@ class MProvConnection:
                                                            dvalue DOUBLE PRECISION,
                                                            fvalue REAL,
                                                            tvalue DATE,
+                                                           tsvalue TIMESTAMP,
                                                            index BIGINT,
                                                            PRIMARY KEY(_resource, _key, label),
                                                            UNIQUE(_resource,_key,index),
@@ -146,13 +154,20 @@ class MProvConnection:
         return
     
     def create_or_reset_graph(self):
-        self.prov_api.create_or_reset_provenance_graph(self.get_graph())
-        self.user_token = self.store_agent(self.config.provenance.user)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (self.get_graph(),))
+        try:
+            self.store_agent(self.get_username())
+        except psycopg2.errors.UniqueViolation:
+            pass
         self.flush()
 
     def create_or_reuse_graph(self):
-        self.prov_api.create_provenance_graph(self.get_graph())
-        self.user_token = self.store_agent(self.config.provenance.user)
+        try:
+            self.store_agent(self.get_username())
+        except psycopg2.errors.UniqueViolation:
+            pass
         self.flush()
 
     def get_graph(self):
@@ -170,17 +185,8 @@ class MProvConnection:
         """
         self.graph_name = name
 
-    def get_provenance_store(self):
-        return self.prov_dm_api
-
-    def get_low_level_api(self):
-        return self.prov_api
-
-    def get_auth_api(self):
-        return self.auth_api
-
     def get_username(self):
-        return self.config.provenance.user
+        return config.provenance.user
 
     # Create a unique ID for an operator stream window
     @staticmethod
@@ -206,8 +212,8 @@ class MProvConnection:
     @staticmethod
     def get_stream_from_entity_id(eid):
         # type: (str) -> str
-        if isinstance(eid, pennprov.QualifiedName):
-            eid = eid.local_part
+        if eid.startswith('{'):
+            eid = MProvConnection.parse_qname(eid).local_part
 
         if '._e' in eid:
             return eid[eid.index('._e')+3:]
@@ -227,23 +233,36 @@ class MProvConnection:
     def get_activity_id(operator, aid):
         # type: (str, Any) -> str
         if aid:
-            return operator + '._a' + str(aid)
+            dk = hashlib.pbkdf2_hmac('sha256', (operator+aid).encode('utf-8'), b'prov', 20)
+
+            stream = binascii.hexlify(dk).decode('utf-8')
+            print(stream)
+
+            return stream#operator + '._a' + str(aid)
         else:
-            return 'a_' + operator
+            dk = hashlib.pbkdf2_hmac('sha256', (operator).encode('utf-8'), b'prov', 20)
+
+            stream = binascii.hexlify(dk).decode('utf-8')
+            return stream#'a_' + operator
 
     def get_agent_token(self, agent_name):
-        # type (str) -> pennprov.QualifiedName
+        # type (str) -> str
         return  self.get_token_qname(self.get_agent_id(agent_name))
 
     def store_agent(self, agent_name):
-        # type: (str) -> pennprov.QualifiedName
+        # type: (str) -> str
+        agent_key = self._get_qname(self.user_token)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'AGENT') ON CONFLICT DO NOTHING", \
+                    (agent_key,self.get_graph()))
 
-        data = []
-        data.append(pennprov.Attribute(name=self._get_qname('uname'), value=agent_name, type='STRING'))
+                key = self._get_qname('agent_name')
+                value = self.user_token
 
-        agent = pennprov.NodeModel(type='AGENT', attributes=data)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=self.user_token, body=agent)
+                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
+                    (agent_key, self.get_graph(), key, value))
+
         logging.debug('Storing AGENT %s' % str(self.user_token))
 
         return self.user_token
@@ -253,7 +272,7 @@ class MProvConnection:
                        start,
                        end,
                        location= None):
-        # type: (str, int, int, int) -> pennprov.QualifiedName
+        # type: (str, int, int, int) -> str
         """
         Create an entity node for an activity (a stream operator computation)
 
@@ -263,30 +282,81 @@ class MProvConnection:
         :param location: Index position etc
         :return:
         """
-        data = []
-        data.append(pennprov.Attribute(name=self._get_qname('hash'), value=activity, type='STRING'))
-        data.append(pennprov.Attribute(name=self._get_qname('agent'), value=self.config.provenance.user, type='STRING'))
+        node_key = self.get_activity_id(activity,location)#self._get_qname(self.get_activity_id(activity,location))
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ACTIVITY') ON CONFLICT DO NOTHING", \
+                    (node_key,self.get_graph()))
 
-        tok = pennprov.ProvTokenModel(token_value=self.get_activity_id('activity', location))
-        token = self.get_token_qname(self.get_activity_id(activity, location))
-        activity = pennprov.NodeModel(type='ACTIVITY', attributes=data,
-                                      location=tok, start_time=start, end_time=end)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=token, body=activity)
+                key = self._get_qname('hash')
+                value = activity
 
-        data2 = []
+                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
+                    (node_key, self.get_graph(), key, value))
 
-        data.append(pennprov.Attribute(name=pennprov.QualifiedName('prov', 'role'), value='loggedInUser', type='STRING'))
-        # Then we add a relationship edge (of type ANNOTATED)
-        association = pennprov.RelationModel(
-            type='ASSOCIATION', subject_id=token, object_id=self.user_token, attributes=data2)
-        self.cache.store_relation(resource=self.get_graph(), body=association, label='wasAssociatedWith')
+                key = self._get_qname('agent')
+                value = self.get_username()
+
+                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',1) ON CONFLICT DO NOTHING", \
+                    (node_key, self.get_graph(), key, value))
+
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasAssociatedWith') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(),node_key,self._get_qname(value)))
+
+                key = self._get_qname('provDmStartTime')
+                value = datetime.datetime.now()
+                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',2) ON CONFLICT DO NOTHING", \
+                    (node_key, self.get_graph(), key, value))
+                key = self._get_qname('provDmEndTime')
+                value = datetime.datetime.now()
+                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',3) ON CONFLICT DO NOTHING", \
+                    (node_key, self.get_graph(), key, value))
+
+
+        token = node_key
+
         logging.debug('Storing ACTIVITY %s with ASSOCIATION %s', str(token), str(self.user_token))
 
         return token
 
+    def _write_tuple(self, cursor, resource, node, tuple):
+        if isinstance(tuple, BasicTuple):
+            for i, k in enumerate(tuple.schema.fields):
+                v = tuple[k]
+                if isinstance(v, int):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                elif isinstance(v, float):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                elif isinstance(v, datetime.datetime):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                else:
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+
+                i = i + 1
+        else:
+            i = 0
+            for k,v in tuple.items():
+                if isinstance(v, int):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                elif isinstance(v, float):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                elif isinstance(v, datetime.datetime):
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+                else:
+                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+                        (node, resource, k, v))
+
+                i = i + 1
+
     def store_stream_tuple(self, stream_name, stream_index, input_tuple):
-        # type: (str, int, BasicTuple) -> pennprov.QualifiedName
+        # type: (str, int, BasicTuple) -> str
 
         """
         Create an entity node for a stream tuple
@@ -306,23 +376,20 @@ class MProvConnection:
         # We also embed the token within the tuple, in case the programmer queries the database
         # and wants to see it
         if isinstance(stream_index, int):
-            input_tuple["_prov"] = self.get_entity_id(stream_name, stream_index - 1)
+            input_tuple[self._get_qname("prov")] = self.get_entity_id(stream_name, stream_index - 1)
         else:
-            input_tuple["_prov"] = self.get_entity_id(stream_name, stream_index)
+            input_tuple[self._get_qname("prov")] = self.get_entity_id(stream_name, stream_index)
 
-        # Now we'll create a tuple within the provenance node, to capture the data
-        data = []
-        for i, k in enumerate(input_tuple.schema.fields):
-            qkey = self.get_token_qname(k)
-            data.append(pennprov.Attribute(name=qkey, value=input_tuple[k], type='STRING'))
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
+                    (token,self.get_graph()))
 
-        # Finally, we build an entity node within the graph, with the token and the
-        # attributes
-        entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=token, body=entity_node)
+                self._write_tuple(cursor, self.get_graph(), token, input_tuple)
 
         logging.debug('Storing ENTITY ' + str(token))
+
+        print('Stored tuple %s'%token)
 
         return token
 
@@ -344,16 +411,14 @@ class MProvConnection:
         token = self.get_entity_id(stream)
 
         # Now we'll create a tuple within the provenance node, to capture the data
-        data = []
-        data.append(pennprov.Attribute(name=self._get_qname('prov'), value=token, type='STRING'))
-        data.append(pennprov.Attribute(name=self._get_qname('code'), value=code, type='STRING'))
-        data.append(pennprov.Attribute(name=self._get_qname('type'), value='python3', type='STRING'))
+        data = {self._get_qname("prov"): token, 'code': code, 'type': 'python3'}
 
-        # Finally, we build an entity node within the graph, with the token and the
-        # attributes
-        entity_node = pennprov.NodeModel(type='ENTITY', attributes=data)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=self.get_token_qname(token), body=entity_node)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
+                    (token,self.get_graph()))
+
+                self._write_tuple(cursor, self.get_graph(), token, data)
 
         logging.debug('Storing ENTITY ' + str(token))
 
@@ -362,7 +427,7 @@ class MProvConnection:
     def store_annotations(self,
                           node_token,
                           annotation_dict):
-        # type: (pennprov.QualifiedName, dict) -> List[pennprov.QualifiedName]
+        # type: (str, dict) -> List[str]
         """
         Associate a map of annotations with a node ID
 
@@ -378,29 +443,30 @@ class MProvConnection:
             ann_tokens.append(ann_token)
 
             # The key/value pair will itself be an entity node
-            attributes = [
-                pennprov.Attribute(name=self.get_token_qname(k), value=annotation_dict[k],
-                                   type='STRING')]
+            attributes = {k: annotation_dict[k]}
             self._write_annot(ann_token, node_token, attributes)
 
         return ann_tokens
 
     def _write_annot(self, ann_token, node_token, attributes):
-        entity_node = pennprov.NodeModel(type='ENTITY', attributes=attributes)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=ann_token, body=entity_node)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
+                    (ann_token,self.get_graph()))
 
-        # Then we add a relationship edge (of type ANNOTATED)
-        annotates = pennprov.RelationModel(
-            type='ANNOTATED', subject_id=node_token, object_id=ann_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=annotates, label='_annotated')
+                self._write_tuple(cursor, self.get_graph(), ann_token, attributes)
+
+                # Then we add a relationship edge (of type ANNOTATED)
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'_annotated') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(),ann_token,node_token))
+
 
     def store_annotation(self,
                          stream_name,
                          stream_index,
                          annotation_name,
                          annotation_value):
-        # type: (str, int, str, Any) -> pennprov.QualifiedName
+        # type: (str, int, str, Any) -> str
         """
         Create a node for an annotation to an entity / tuple
 
@@ -418,9 +484,8 @@ class MProvConnection:
         ann_token = self.get_token_qname(self.get_entity_id(stream_name + '.' + annotation_name, stream_index - 1))
 
         # The key/value pair will itself be an entity node
-        attributes = [
-            pennprov.Attribute(name=self.get_token_qname(annotation_name), value=annotation_value,
-                               type='STRING')]
+        attributes = {annotation_name: annotation_value}
+
         self._write_annot(ann_token, node_token, attributes)
 
         return ann_token
@@ -430,7 +495,7 @@ class MProvConnection:
                                 output_stream_index,
                                 input_tokens_list
                                 ):
-        # type: (str, int, list) -> pennprov.QualifiedName
+        # type: (str, int, list) -> str
         """
         Store a mapping between an operator window, from
         which a stream is to be derived, and the input
@@ -448,22 +513,20 @@ class MProvConnection:
         else:
             window_token = self.get_token_qname(self.get_window_id(output_stream_name, output_stream_index))
 
-        # Finally, we build an entity node within the graph, with the token and the
-        # attributes
-        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=[])
-        self.cache.store_node(resource=self.get_graph(),
-                              token=window_token, body=coll_node)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
+                    (window_token,self.get_graph()))
 
-        logging.debug('Storing COLLECTION %s' % str(window_token))
+                logging.debug('Storing COLLECTION %s' % str(window_token))
 
-        for token in input_tokens_list:
-            # Add a relationship edge (of type ANNOTATED)
-            # from window to its inputs
-            token_qname = self.get_token_qname(token)
-            annotates = pennprov.RelationModel(
-                type='MEMBERSHIP', subject_id=window_token, object_id=token_qname, attributes=[])
+                for token in input_tokens_list:
+                    # Add a relationship edge (of type ANNOTATED)
+                    # from window to its inputs
+                    token_qname = self.get_token_qname(token)
 
-            self.cache.store_relation(resource=self.get_graph(), body=annotates, label='hadMember')
+                    cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
+                        (self.get_graph(), window_token, token_qname))
 
         return window_token
 
@@ -476,7 +539,7 @@ class MProvConnection:
                              start,
                              end
                              ):
-        # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
+        # type: (str, int, BasicTuple, list, str, int, int) -> str
         """
         When we have a windowed computation, this creates a complex derivation subgraph
         in one operation.
@@ -494,24 +557,24 @@ class MProvConnection:
 
         activity_token = self.store_activity(activity, start, end, output_stream_index)
 
-        derives = pennprov.RelationModel(
-            type='DERIVATION', subject_id=result_token, object_id=input_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), result_token, input_token))
 
-        uses = pennprov.RelationModel(
-            type='USAGE', subject_id=activity_token, object_id=input_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=uses, label='used')
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), activity_token, input_token))
 
-        generates = pennprov.RelationModel(
-            type='GENERATION', subject_id=result_token, object_id=activity_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), result_token, activity_token))
 
+        logging.debug('Storing DERIVATION %s', result_token)
         return result_token
 
     def create_collection(self,
                           collection_name, collection_version=None,
                           prior_token=None):
-        # type: (str, int, pennprov.QualifiedName) -> pennprov.QualifiedName
+        # type: (str, int, pennprov.QualifiedName) -> str
         """
         We can create a collection to represent a sub-sequence, a sub-stream, or a subset of items
 
@@ -522,25 +585,22 @@ class MProvConnection:
         """
         token = self.get_token_qname(self.get_entity_id(collection_name, collection_version))
 
-        data = []
-        # data.append(pennprov.Attribute(name='collection', value=collection_name, type='STRING'))
-        # if collection_version:
-        #     data.append(pennprov.Attribute(name='version', value=collection_version, type='INTEGER'))
-
         # Create a node for the collection
-        coll_node = pennprov.NodeModel(type='COLLECTION', attributes=data)
-        self.cache.store_node(resource=self.get_graph(),
-                              token=token, body=coll_node)
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
+                    (token,self.get_graph()))
 
         if prior_token:
-            derives = pennprov.RelationModel(
-                type='REVISION', subject_id=token, object_id=prior_token, attributes=[])
-            self.cache.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
+            with self.graph_conn as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
+                        (self.get_graph(), token, prior_token))
 
         return token
 
     def add_to_collection(self, tuple_token, collection_token):
-        # type (pennprov.QualifiedName, pennprov.QualifiedName) -> pennprov.QualifiedName
+        # type (str, str) -> str
         """
         Associate a tuple with a collection (using the tokens for each)
 
@@ -548,10 +608,10 @@ class MProvConnection:
         :param collection_token:
         :return:
         """
-        part_of = pennprov.RelationModel(
-            type='MEMBERSHIP', subject_id=collection_token, object_id=tuple_token, attributes=[])
-
-        self.cache.store_relation(resource=self.get_graph(), body=part_of, label='hadMember')
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), collection_token, tuple_token))
 
     def store_windowed_result(self,
                               output_stream_name,
@@ -562,7 +622,7 @@ class MProvConnection:
                               start,
                               end
                               ):
-        # type: (str, int, BasicTuple, list, str, int, int) -> pennprov.QualifiedName
+        # type: (str, int, BasicTuple, list, str, int, int) -> str
         """
         When we have a windowed computation, this creates a complex derivation subgraph
         in one operation.
@@ -576,36 +636,77 @@ class MProvConnection:
         :param end: End time
         :return:
         """
+        print('Input tokens', input_tokens_list)
+
         result_token = self.store_stream_tuple(output_stream_name, output_stream_index, output_tuple)
         window_token = self.store_window_and_inputs(output_stream_name, output_stream_index, input_tokens_list)
 
         activity_token = self.store_activity(activity, start, end, output_stream_index)
 
-        derives = pennprov.RelationModel(
-            type='DERIVATION', subject_id=result_token, object_id=window_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), result_token, window_token))
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), activity_token, window_token))
 
-        uses = pennprov.RelationModel(
-            type='USAGE', subject_id=activity_token, object_id=window_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=uses, label='used')
-
-        generates = pennprov.RelationModel(
-            type='GENERATION', subject_id=result_token, object_id=activity_token, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), result_token, activity_token))
 
         return result_token
 
+    def store_derived_from(self, derived_node, source_node):
+        # types: (str, str) -> str
+        """
+        Stores a derivation of an output from an input
+        :param derived_node:
+        :param source_node:
+        :return:
+        """
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), derived_node, source_node))
+
+    def store_used(self, activity_node, input_node):
+        # types: (str, str) -> str
+        """
+        Stores a usage relationship between an activity and an input
+        :param activity_node:
+        :param input_node:
+        :return:
+        """
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), activity_node, input_node))
+
+    def store_generated_by(self, output_node, activity_node):
+        # types: (str, str) -> str
+        """
+        Stores an edge indicating an output was generated by an activity
+        :param self:
+        :param output_node:
+        :param activity_node:
+        :return:
+        """
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
+                    (self.get_graph(), output_node, activity_node))
+
     def _get_qname(self, local_part):
-        # types: (str) -> pennprov.QualifiedName
+        # types: (str) -> str
         """
         Returns a qualified name from a string to be used as the local part
         :param local_part:
         :return:
         """
-        return pennprov.QualifiedName(self.namespace, local_part)
+        return "{" + self.namespace + "}" + local_part
+        #return pennprov.QualifiedName(self.namespace, local_part)
 
     def get_token_qname(self, token):
-        # types: (str) -> pennprov.QualifiedName
+        # types: (str) -> str
         """
         Returns a qualified name created by hashing the given token. Used for cases where the length of
         the resulting name needs to be of limited length, for example when creating a prov token.
@@ -618,70 +719,19 @@ class MProvConnection:
         else:
             return self._get_qname(token)
 
-    @classmethod
-    def parse_qname(cls, token_value):
-        # types (str) -> pennprov.QualifiedName
-        """
-        Returns a QualifiedName by parsing the given string as a namespace and local part
-        :param token_value: a string of the form '{' + namespace + '}' + local_part
-        :return: the corresponding pennprov.QualifiedName
-        """
-        match = cls.QNAME_REGEX.match(token_value)
-        if not match:
-            raise ValueError('cannot parse as QualfiedName:', token_value)
-        qname = pennprov.QualifiedName(namespace=match.group(1), local_part=match.group(2))
-        return qname
-
-    def store_derived_from(self, derived_node, source_node):
-        # types: (pennprov.QualifiedName, pennprov.QualifiedName) -> pennprov.QualifiedName
-        """
-        Stores a derivation of an output from an input
-        :param derived_node:
-        :param source_node:
-        :return:
-        """
-        derives = pennprov.RelationModel(
-            type='DERIVATION', subject_id=derived_node, object_id=source_node, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=derives, label='wasDerivedFrom')
-
-    def store_used(self, activity_node, input_node):
-        # types: (pennprov.QualifiedName, pennprov.QualifiedName) -> pennprov.QualifiedName
-        """
-        Stores a usage relationship between an activity and an input
-        :param activity_node:
-        :param input_node:
-        :return:
-        """
-        uses = pennprov.RelationModel(
-            type='USAGE', subject_id=activity_node, object_id=input_node, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=uses, label='used')
-
-    def store_generated_by(self, output_node, activity_node):
-        # types: (pennprov.QualifiedName, pennprov.QualifiedName) -> pennprov.QualifiedName
-        """
-        Stores an edge indicating an output was generated by an activity
-        :param self:
-        :param output_node:
-        :param activity_node:
-        :return:
-        """
-        generates = pennprov.RelationModel(
-            type='GENERATION', subject_id=output_node, object_id=activity_node, attributes=[])
-        self.cache.store_relation(resource=self.get_graph(), body=generates, label='wasGeneratedBy')
-
     def get_node(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[Dict]
+        # type: (str) -> List[Dict]
         """
         Returns the tuple data associated with a node ID (generally an entity node)
         :param entity_id:
         :return:
         """
-        result = self.cache.get_provenance_data(self.get_graph(), (entity_id))
+        result = self.get_provenance_data(self.get_graph(), (entity_id))
 
         return result
 
     def get_source_entities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Given an entity node, what was it derived from?
         :param entity_id:
@@ -689,14 +739,14 @@ class MProvConnection:
         :param entity_id:
         :return:
         """
-        results = self.cache.get_connected_from(self.get_graph(), (entity_id), 'wasDerivedFrom')
+        results = self.get_connected_from(self.get_graph(), (entity_id), 'wasDerivedFrom')
         # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
         return results
 
     def get_derived_entities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
-        results = self.cache.get_connected_to(self.get_graph(), (entity_id), 'wasDerivedFrom')
-        # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
+        # type: (pennprov.QualifiedName) -> List[str]
+        results = self.get_connected_to(self.get_graph(), (entity_id), 'wasDerivedFrom')
+
         return results
 
     # def get_predecessor_entities(self, entity_id):
@@ -708,69 +758,67 @@ class MProvConnection:
     #     return
 
     def get_parent_entities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Find a parent collection (ie a node where this node is a member)
         :param entity_id:
         :return:
         """
-        results = self.cache.get_connected_to(self.get_graph(), (entity_id), 'hadMember')
+        results = self.get_connected_to(self.get_graph(), (entity_id), 'hadMember')
         # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
         return results
 
     def get_child_entities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Find any child (member) nodes
         :param entity_id:
         :return:
         """
-        results = self.cache.get_connected_from(self.get_graph(), (entity_id), 'hadMember')
+        results = self.get_connected_from(self.get_graph(), (entity_id), 'hadMember')
         # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
         return results
 
     def get_creating_activities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Get the list of activities that from which this output was generated
         :param entity_id:
         :return:
         """
-        results = self.cache.get_connected_from(self.get_graph(), (entity_id), 'wasGeneratedBy')
-        # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
+        results = self.get_connected_from(self.get_graph(), (entity_id), 'wasGeneratedBy')
+
         return results
 
     def get_activity_outputs(self, activity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Get the list of entities this activity generated
         :param activity_id:
         :return:
         """
-        results = self.cache.get_connected_to(self.get_graph(), (activity_id), 'wasGeneratedBy')
-        # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
+        results = self.get_connected_to(self.get_graph(), (activity_id), 'wasGeneratedBy')
         return results
 
     def get_activity_inputs(self, activity_id):
-        # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
+        # type: (str) -> List[str]
         """
         Given an activity, what inputs did it use?
         :param activity_id:
         :return:
         """
-        results = self.cache.get_connected_from(self.get_graph(), (activity_id), 'used')
+        results = self.get_connected_from(self.get_graph(), (activity_id), 'used')
         # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
         return results
 
     def get_annotations(self, node_id):
-        # type: (pennprov.QualifiedName) -> List[dict]
+        # type: (str) -> List[dict]
         """
         Given a node, find its annotations and return as a list of typed key/values
         :param node_id:
         :return:
         """
-        results = self.cache.get_connected_from(self.get_graph(), (node_id), '_annotated')
-        # results = [self.parse_qname(tok.token_value) for tok in results.tokens]
+        results = self.get_connected_from(self.get_graph(), (node_id), '_annotated')
 
         results = [self.get_node(eid) for eid in results]
 
@@ -803,6 +851,20 @@ class MProvConnection:
                 producers.append(code[1]['code'])
 
         return producers
+
+    @classmethod
+    def parse_qname(cls, token_value):
+        # types (str) -> pennprov.QualifiedName
+        """
+        Returns a QualifiedName by parsing the given string as a namespace and local part
+        :param token_value: a string of the form '{' + namespace + '}' + local_part
+        :return: the corresponding pennprov.QualifiedName
+        """
+        match = cls.QNAME_REGEX.match(token_value)
+        if not match:
+            raise ValueError('cannot parse as QualfiedName:', token_value)
+        qname = pennprov.QualifiedName(namespace=match.group(1), local_part=match.group(2))
+        return qname
 
     def flush(self):
         return
