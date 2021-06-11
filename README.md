@@ -1,6 +1,6 @@
-# pennprov
+# mprov
 
-This Python package connects to the [PennProvenance](https://pennprovenance.net) provenance services, which are part of the broader Habitat Data Environment.  Additional high-level services oriented towards the mProv stream data provenance project are also included.
+This Python package is a fork of the [PennProvenance](https://pennprovenance.net) provenance services, which are part of the broader Penn Data Habitat Environment.  Project development was funded by NSF grant 1650813.
 
 ## Purpose
 
