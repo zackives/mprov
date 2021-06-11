@@ -13,25 +13,4 @@ services:
     ports:
      - '5432:5432'
 
-  neo4j:
-    restart: always
-    image: neo4j:3.5
-    ports:
-     - "7474:7474"
-     - "7687:7687"
-    volumes:
-     - /docker/neo4j:/data
-    environment:
-     NEO4J_AUTH: "neo4j/habitat1"
-
-  penn-provenance:
-    restart: always
-    image: pennprov/penn-provenance:v2.4
-    ports:
-     - '8088:8088'
-    depends_on:
-     - postgres
-     - neo4j
-
-
 
