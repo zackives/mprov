@@ -296,7 +296,7 @@ class MProvConnection:
                 cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',1) ON CONFLICT DO NOTHING", \
                     (node_key, self.get_graph(), key, value))
 
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasAssociatedWith') ON CONFLICT DO NOTHING", \
+                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES((%s),(%s),(%s),'wasAssociatedWith') ON CONFLICT DO NOTHING", \
                     (self.get_graph(),node_key,self._get_qname(value)))
 
                 key = self._get_qname('provDmStartTime')
@@ -450,7 +450,7 @@ class MProvConnection:
                 # Then we add a relationship edge (of type ANNOTATED)
                 cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'_annotated') ON CONFLICT DO NOTHING", \
                     (self.get_graph(),ann_token,node_token))
-                print('Wrote ANNOT edge %s'%ann_token)
+                logging.debug('Wrote ANNOT edge %s' % ann_token)
 
                 # Write the annotation tuple
                 self._write_tuple(cursor, self.get_graph(), ann_token, attributes)
@@ -569,7 +569,7 @@ class MProvConnection:
     def create_collection(self,
                           collection_name, collection_version=None,
                           prior_token=None):
-        # type: (str, int, pennprov.QualifiedName) -> str
+        # type: (str, int, str) -> str
         """
         We can create a collection to represent a sub-sequence, a sub-stream, or a subset of items
 
@@ -696,7 +696,6 @@ class MProvConnection:
         :return:
         """
         return "{" + self.namespace + "}" + local_part
-        #return pennprov.QualifiedName(self.namespace, local_part)
 
     def get_token_qname(self, token):
         # types: (str) -> str
@@ -737,18 +736,10 @@ class MProvConnection:
         return results
 
     def get_derived_entities(self, entity_id):
-        # type: (pennprov.QualifiedName) -> List[str]
+        # type: (str) -> List[str]
         results = self.get_connected_to(self.get_graph(), (entity_id), 'wasDerivedFrom')
 
         return results
-
-    # def get_predecessor_entities(self, entity_id):
-    #     # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
-    #     return
-    #
-    # def get_successor_entities(self, entity_id):
-    #     # type: (pennprov.QualifiedName) -> List[pennprov.QualifiedName]
-    #     return
 
     def get_parent_entities(self, entity_id):
         # type: (str) -> List[str]
@@ -811,15 +802,11 @@ class MProvConnection:
         :param node_id:
         :return:
         """
-        results = self.get_connected_from(self.get_graph(), (node_id), '_annotated')
+        results = self.get_connected_to(self.get_graph(), (node_id), '_annotated')
 
         results = [self.get_node(eid) for eid in results]
 
         return results
-
-    # def get_entity_and_ancestor_annotations(self, entity_id):
-    #     # type: (pennprov.QualifiedName) -> dict
-    #     return
 
     def get_stream_inputs(self, stream_name):
         inputs = []
@@ -839,33 +826,20 @@ class MProvConnection:
             code = self.get_node(node)
 
             if len(code) > 0:
-                code_id  = code[0]['hash']
-                code = self.get_node(self.get_token_qname(code_id))
-                producers.append(code[1]['code'])
+                code_id  = code[0][0]#[self._get_qname('hash')]
+                #print(code_id)
+                code = self.get_node(code_id)#self.get_token_qname(code_id))
+                producers.append(self._get_qname(code[0]['code']))
 
         return producers
 
     @classmethod
-    def parse_qname(cls, token_value):
-        # types (str) -> pennprov.QualifiedName
-        """
-        Returns a QualifiedName by parsing the given string as a namespace and local part
-        :param token_value: a string of the form '{' + namespace + '}' + local_part
-        :return: the corresponding pennprov.QualifiedName
-        """
-        match = cls.QNAME_REGEX.match(token_value)
-        if not match:
-            raise ValueError('cannot parse as QualfiedName:', token_value)
-        qname = pennprov.QualifiedName(namespace=match.group(1), local_part=match.group(2))
-        return qname
-
-    @classmethod
     def get_local_part(cls, token_value):
-        # types (str) -> pennprov.QualifiedName
+        # types (str) -> str
         """
         Returns a QualifiedName by parsing the given string as a namespace and local part
         :param token_value: a string of the form '{' + namespace + '}' + local_part
-        :return: the corresponding pennprov.QualifiedName
+        :return: the corresponding local portion of the name
         """
         match = cls.QNAME_REGEX.match(token_value)
         if not match:
@@ -874,14 +848,39 @@ class MProvConnection:
 
     def get_provenance_data(self, resource, token):
         # type: (str, str) -> List[Dict]
-        res = {}
+        ret = []
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT index,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue FROM MProv_NodeProp WHERE _resource = (%s) AND _key = (%s) AND index IS NOT NULL", (resource,token))
+                cursor.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,label FROM MProv_NodeProp WHERE _resource = (%s) AND _key = (%s)", (resource,token))
 
-                print ("Results:", token, cursor.fetchall())
+                results = cursor.fetchall()
+                ret = {}#[None for i in range(0,len(results))]
+                for res in results:
+                    #print(res)
+                    inx = res[0]
+                    if inx is None:
+                        inx = res[9]
+                    if res[1] is None or res[1] == 'S':
+                        ret[inx] = res[2]
+                    elif res[1] == 'I':
+                        ret[inx] = res[3]
+                    elif res[1] == 'L':
+                        ret[inx] = res[4]
+                    elif res[1] == 'F':
+                        ret[inx] = res[5]
+                    elif res[1] == 'D':
+                        ret[inx] = res[6]
+                    elif res[1] == 'T':
+                        ret[inx] = res[7]
+                    elif res[1] == 't':
+                        ret[inx] = res[8]
+                    else:
+                        raise RuntimeError('Unknown code ' + res[1])
 
-        return [res]
+
+                #print ("Results:", token, cursor.fetchall())
+
+        return [ret]
 
     def get_connected_to(self, resource, token, label1):
         # type: (str, str, str) -> List[pennprov.ProvTokenSetModel]
