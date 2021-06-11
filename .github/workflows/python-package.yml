@@ -10,8 +10,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Label of the runner job
-  runner-job:
+  build-with-postgres:
     # You must use a Linux environment when using service containers or container jobs
     runs-on: ubuntu-latest
 
@@ -33,8 +32,6 @@ jobs:
         ports:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
-  build:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
