@@ -12,7 +12,7 @@
 """
 from __future__ import print_function
 
-from typing import List, Any
+from typing import List, Any, Dict
 import hashlib
 import binascii
 import logging
