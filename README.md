@@ -60,7 +60,7 @@ Create a new sample user called `YOUR_USERNAME` with password `YOUR_PASSWORD`.
 More detailed information is available in the [mProv API overview](mProv.md).  Here's a brief example using `MProvConnection`.
 
 ```
-from pennprov.connection.mprov_connection import MProvConnection
+from pennprov.connection.mprov import MProvConnection
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 from datetime import datetime, timezone
 
@@ -84,6 +84,7 @@ input_token = conn.store_stream_tuple('SampleStream', tuple['key'], tuple)
 # Compute an operation over the tuple, convert it to a tuple
 ts = datetime.now(timezone.utc)
 result = area_circle(tuple)
+# Rather than BasicTuple, which has a schema, you may also use a dict
 out_tuple = BasicTuple(data_schema, result)
 
 # Store the derived tuple and the derivation name / time
@@ -92,106 +93,6 @@ conn.store_derived_result('OutStream', out_tuple['key'], out_tuple, input_token,
 ```
 
 We have also included `Jupyter-PennProv.ipynb`, which is a Jupyter Notebook suitable for running in a Dockerized Jupyter (e.g., `all-spark-notebook`) that will connect to PennProvenance.
-
-## Getting Started - Low-Level Client
-
-The following illustrates a simple use of the API to obtain a authentication token and then store and retrieve nodes and edges.
-
-```python
-"""Example usage of pennprov client"""
-
-from __future__ import print_function
-from pprint import pprint
-import argparse
-import getpass
-
-import pennprov
-from pennprov.rest import ApiException
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-u', '--user', required=True, help='username')
-    parser.add_argument('-p', '--password',
-                        help='password (will be prompted if omitted)')
-
-    args = parser.parse_args()
-    username = args.user
-    password = args.password if args.password else getpass.getpass()
-
-    """Get a token and store a node"""
-    # create instances of the API classes
-    configuration = pennprov.configuration.Configuration()
-    configuration.host = "http://localhost:8088"
-    api_client = pennprov.ApiClient(configuration)    
-    auth_api = pennprov.AuthenticationApi(api_client)
-    prov_api = pennprov.ProvenanceApi(api_client)
-    prov_dm_api = pennprov.ProvDmApi(api_client)
-    credentials = pennprov.UserCredentials(password)
-    graph_name = "my_graph"
-
-    try:
-        # One-time initialization of client with a JWT token for
-        # authentication.
-        web_token = auth_api.get_token_route(username, credentials)
-        token = web_token.token
-        print("Setting token %s\n" % token)
-        configuration.api_key["api_key"] = token
-
-        # Once api_key is set we can call services. For example,
-        # store_prov_node
-        prov_token_value = "my_prov_token"
-        stream = pennprov.IDModel("my_stream.0")
-        prov_location = pennprov.ProvLocationModel(
-            stream=stream,
-            field="my_source",
-            position=[1, 2])
-        data = [pennprov.FieldModel(
-            name="my_boolean_field", type="BOOLEAN", value="true")]
-        tuple_with_schema = pennprov.TupleWithSchemaModel(
-            schema_name="my_schema", tuple=data, lookup_keys=[])
-        body = pennprov.StoreNodeModel(
-            prov_specifier=prov_location, tuple_with_schema=tuple_with_schema)
-        prov_api.create_provenance_graph(graph_name)
-        prov_api.store_provenance_node(graph_name, prov_token_value, body)
-
-        # Retrieve the data from the node
-        response = prov_api.get_provenance_data(graph_name, prov_token_value)
-        pprint(response)
-
-        # We can also use the ProvDmApi to create PROV data model specific nodes and relations.
-        prov_dm_graph = 'my PROV DM graph'
-        namespace = 'http://example.com'
-        prov_api.create_provenance_graph(prov_dm_graph)
-        inputProvId = pennprov.QualifiedName(namespace, 'input1')
-        inputEntity = pennprov.NodeModel(type='ENTITY', attributes=[pennprov.Attribute(
-            name=pennprov.QualifiedName(namespace, 'stringAttr'), value='paramValue', type='STRING')])
-        prov_dm_api.store_node(resource=prov_dm_graph,
-                               token=inputProvId, body=inputEntity)
-
-        outputProvId = pennprov.QualifiedName(namespace, 'output1')
-        outputEntity = pennprov.NodeModel(type='ENTITY', attributes=[pennprov.Attribute(
-            name=pennprov.QualifiedName(namespace, 'longAttr'), value=16, type='LONG')])
-        prov_dm_api.store_node(resource=prov_dm_graph,
-                               token=outputProvId, body=outputEntity)
-
-        wasDerivedFrom = pennprov.RelationModel(
-            type='DERIVATION', subject_id=outputProvId, object_id=inputProvId,
-            attributes=[pennprov.Attribute(name=pennprov.QualifiedName(namespace, 'booleanAttr'), value=True, type='BOOLEAN'),
-                        pennprov.Attribute(name=pennprov.QualifiedName(namespace, 'anotherStringAttr'), value='attrValue', type='STRING')])
-        prov_dm_api.store_relation(resource=prov_dm_graph, body=wasDerivedFrom, label='wasDerivedFrom')
-
-        # And stil use the base ProvenanceApi to retrieve information about the PROV DM graph
-        edge = prov_api.get_edges_from(prov_dm_graph, outputProvId)
-        pprint(edge)
-    except ApiException as api_exception:
-        print("Exception when calling server: %s\n" % api_exception)
-
-
-if __name__ == '__main__':
-    main()
-
-```
 
 ## Documentation for API Endpoints
 
@@ -229,73 +130,6 @@ Class | Method | HTTP request | Description
 *PermissionApi* | [**grant_user_permission_on**](docs/PermissionApi.md#grant_user_permission_on) | **POST** /perms/objects/{object}/user/{username}/{permname} | Grants a user a permission on an object
 *PermissionApi* | [**revoke_group_permission_on**](docs/PermissionApi.md#revoke_group_permission_on) | **DELETE** /perms/objects/{object}/group/{groupName}/{permname} | Revokes a group a permission on an object
 *PermissionApi* | [**revoke_user_permission_on**](docs/PermissionApi.md#revoke_user_permission_on) | **DELETE** /perms/objects/{object}/user/{username}/{permname} | Revokes a user a permission on an object
-*ProvDmApi* | [**store_node**](docs/ProvDmApi.md#store_node) | **PUT** /provdm/graphs/{resource}/nodes/{token} | Store a PROV DM node
-*ProvDmApi* | [**store_relation**](docs/ProvDmApi.md#store_relation) | **POST** /provdm/graphs/{resource}/links/{label} | Store a relation between PROV DM tokens
-*ProvenanceApi* | [**create_or_reset_provenance_graph**](docs/ProvenanceApi.md#create_or_reset_provenance_graph) | **PUT** /provenance/graphs/reset/{resource} | Create a provenance graph if it doesn&#39;t exist, or overwrite it if it does
-*ProvenanceApi* | [**create_provenance_graph**](docs/ProvenanceApi.md#create_provenance_graph) | **PUT** /provenance/graphs/{resource} | Create a provenance graph
-*ProvenanceApi* | [**get_connected_from**](docs/ProvenanceApi.md#get_connected_from) | **GET** /provenance/graphs/{resource}/nodes/{token}/neighbors/out | Get the outgoing neighbors of the given prov token
-*ProvenanceApi* | [**get_connected_to**](docs/ProvenanceApi.md#get_connected_to) | **GET** /provenance/graphs/{resource}/nodes/{token}/neighbors/in | Get the incoming neighbors of the given prov token
-*ProvenanceApi* | [**get_edges_from**](docs/ProvenanceApi.md#get_edges_from) | **GET** /provenance/graphs/{resource}/nodes/{token}/links/out | Get the outgoing edges of the given prov token
-*ProvenanceApi* | [**get_edges_to**](docs/ProvenanceApi.md#get_edges_to) | **GET** /provenance/graphs/{resource}/nodes/{token}/links/in | Get the incoming edges of the given prov token
-*ProvenanceApi* | [**get_provenance_data**](docs/ProvenanceApi.md#get_provenance_data) | **GET** /provenance/graphs/{resource}/nodes/{token} | Get the tuple associated with a provenance token
-*ProvenanceApi* | [**get_provenance_location**](docs/ProvenanceApi.md#get_provenance_location) | **GET** /provenance/graphs/{resource}/nodes/{token}/location | Get the location of a provenance token
-*ProvenanceApi* | [**get_provenance_nodes**](docs/ProvenanceApi.md#get_provenance_nodes) | **GET** /provenance/graphs/{resource}/nodes | Get the provenance graph&#39;s nodes
-*ProvenanceApi* | [**get_subgraph_template**](docs/ProvenanceApi.md#get_subgraph_template) | **GET** /provenance/graphs/{resource}/subgraphs/template | Get the subgraph template of a provenance graph
-*ProvenanceApi* | [**get_subgraphs**](docs/ProvenanceApi.md#get_subgraphs) | **POST** /provenance/graphs/{resource}/subgraphs | Get a provenance graph as a sequence of subgraphs
-*ProvenanceApi* | [**store_provenance_link**](docs/ProvenanceApi.md#store_provenance_link) | **POST** /provenance/graphs/{resource}/links | Store a provenance link between tokens
-*ProvenanceApi* | [**store_provenance_node**](docs/ProvenanceApi.md#store_provenance_node) | **PUT** /provenance/graphs/{resource}/nodes/{token} | Store a provenance token with its location
-*ProvenanceApi* | [**store_subgraph**](docs/ProvenanceApi.md#store_subgraph) | **POST** /provenance/graphs/{resource}/subgraphs/store | Store a subgraph to a provenance graph
-*ProvenanceApi* | [**store_subgraph_template**](docs/ProvenanceApi.md#store_subgraph_template) | **POST** /provenance/graphs/{resource}/subgraphs/template | Store a subgraph template for a provenance graph
-
-
-## Documentation For Models
-
- - [Attribute](docs/Attribute.md)
- - [FieldModel](docs/FieldModel.md)
- - [GroupDetails](docs/GroupDetails.md)
- - [IDModel](docs/IDModel.md)
- - [LinkInfo](docs/LinkInfo.md)
- - [LinkInstance](docs/LinkInstance.md)
- - [NodeInfo](docs/NodeInfo.md)
- - [NodeInstance](docs/NodeInstance.md)
- - [NodeModel](docs/NodeModel.md)
- - [OrgDetails](docs/OrgDetails.md)
- - [ProvEdgeModel](docs/ProvEdgeModel.md)
- - [ProvEdgeSetModel](docs/ProvEdgeSetModel.md)
- - [ProvNodeMapModel](docs/ProvNodeMapModel.md)
- - [ProvSpecifierModel](docs/ProvSpecifierModel.md)
- - [ProvTokenSetModel](docs/ProvTokenSetModel.md)
- - [QualifiedName](docs/QualifiedName.md)
- - [RankInstance](docs/RankInstance.md)
- - [RelationModel](docs/RelationModel.md)
- - [ResponseError](docs/ResponseError.md)
- - [StoreLinkModel](docs/StoreLinkModel.md)
- - [StoreNodeModel](docs/StoreNodeModel.md)
- - [SubgraphInstance](docs/SubgraphInstance.md)
- - [SubgraphTemplate](docs/SubgraphTemplate.md)
- - [TupleWithSchemaModel](docs/TupleWithSchemaModel.md)
- - [UserCredentials](docs/UserCredentials.md)
- - [UserInfo](docs/UserInfo.md)
- - [WebToken](docs/WebToken.md)
- - [BooleanAttribute](docs/BooleanAttribute.md)
- - [BooleanFieldModel](docs/BooleanFieldModel.md)
- - [DoubleAttribute](docs/DoubleAttribute.md)
- - [DoubleFieldModel](docs/DoubleFieldModel.md)
- - [IntAttribute](docs/IntAttribute.md)
- - [IntegerFieldModel](docs/IntegerFieldModel.md)
- - [LongAttribute](docs/LongAttribute.md)
- - [LongFieldModel](docs/LongFieldModel.md)
- - [MultiFieldModel](docs/MultiFieldModel.md)
- - [ProvExpressionModel](docs/ProvExpressionModel.md)
- - [ProvLocationModel](docs/ProvLocationModel.md)
- - [ProvSpecifierFieldModel](docs/ProvSpecifierFieldModel.md)
- - [ProvTokenFieldModel](docs/ProvTokenFieldModel.md)
- - [ProvTokenModel](docs/ProvTokenModel.md)
- - [QualifiedNameAttribute](docs/QualifiedNameAttribute.md)
- - [QualifiedNameFieldModel](docs/QualifiedNameFieldModel.md)
- - [StringAttribute](docs/StringAttribute.md)
- - [StringFieldModel](docs/StringFieldModel.md)
-
 
 ## Documentation For Authorization
 

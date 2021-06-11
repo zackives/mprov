@@ -4,7 +4,6 @@ import traceback
 from datetime import timezone, datetime
 from functools import wraps
 
-from pennprov import RelationModel
 from pennprov.connection.mprov import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
 from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
