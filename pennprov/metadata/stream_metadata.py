@@ -11,6 +11,8 @@
  limitations under the License.
 """
 
+from typing import Any
+
 class BasicSchema:
     count = 0
     fields = []
