@@ -55,7 +55,7 @@ class MProvConnection:
         if host is None:
             host = config.dbms.host
 
-        self.auth_conn = psycopg2.connect(host=host, database=config.dbms.auth_db, user=user, password=password)
+        #self.auth_conn = psycopg2.connect(host=host, database=config.dbms.auth_db, user=user, password=password)
         self.graph_conn = psycopg2.connect(host=host, database=config.dbms.graph_db, user=user, password=password)
 
         self.user_token = self.get_username()
