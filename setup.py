@@ -14,7 +14,7 @@
 from setuptools import setup, find_packages  # noqa: H301
 
 NAME = "pennprov"
-VERSION = "2.2.11"
+VERSION = "2.2.12.dev30"
 # To install the library, run the following
 #
 # python setup.py install
@@ -23,12 +23,16 @@ VERSION = "2.2.11"
 # http://pypi.python.org/pypi/setuptools
 
 REQUIRES = [
-    "certifi>=2017.4.17",
-    "python-dateutil>=2.1",
+    "certifi>=14.05.14",
+    "python-dateutil>=2.5.3",
     "six>=1.10",
     "urllib3>=1.23",
     "pandas>=1.0",
-    "cachetools>=4.1"
+    "cachetools>=4.1",
+    "sqlparse>=0.3.1",
+    "omegaconf>=1.3.0",
+    "psycopg2>=2.8.6",
+    "pyspark>=2.0.0"
 ]
     
 
