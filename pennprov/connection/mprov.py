@@ -24,6 +24,7 @@ from pennprov.metadata.stream_metadata import BasicTuple
 #from pennprov.cache.graph import GraphCache
 
 import psycopg2
+from psycopg2.extras import execute_values
 from pennprov.config import config
 
 class MProvConnection:
@@ -149,7 +150,71 @@ class MProvConnection:
                 cursor.execute(edge_props_table)
                 cursor.execute(schema_table)
         return
+
+    def _insert_nodes(self, values, cursor):
+        template = "(%%s, '%s', %%s)" % self.get_graph()
+        execute_values(cursor, "INSERT INTO MProv_Node(_key,_resource,label) VALUES %s ON CONFLICT DO NOTHING",
+                    values, template=template)
     
+    def _insert_edges(self, values, cursor):
+        template = "('%s', %%s, %%s, %%s)" % self.get_graph()
+        execute_values(cursor, "INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES %s ON CONFLICT DO NOTHING",
+                        values, template=template)
+
+    def _string_node_prop(self, key, label, value, index, code=None):
+        return (key, label, value, code, None, None, None, None, None, None, index)
+
+    def _timestamp_node_prop(self, key, label, tsvalue, index, code=None):
+        return (key, label, None, code, None, None, None, None, None, tsvalue, index)
+
+    def _int_node_prop(self, key, label, ivalue, index, code=None):
+        return (key, label, None, code, ivalue, None, None, None, None, None, index)
+
+    def _float_node_prop(self, key, label, fvalue, index, code=None):
+        return (key, label, None, code, None, None, None, fvalue, None, None, index)
+
+
+    def _insert_node_props(self, values, cursor):
+        template = """(%%s, 
+                       '%s', 
+                       NULL, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s, 
+                       %%s)""" % self.get_graph() 
+        execute_values(cursor, """INSERT INTO MProv_NodeProp(_key,
+                                                           _resource,
+                                                           type,
+                                                           label,
+                                                           value,
+                                                           code,
+                                                           ivalue,
+                                                           lvalue,
+                                                           dvalue,
+                                                           fvalue,
+                                                           tvalue,
+                                                           tsvalue,
+                                                           index) VALUES %s ON CONFLICT DO NOTHING""",
+                    values, template=template)
+    
+    def _insert_subgraph(self, nodes=None, node_props=None, edges=None, node_key_tuple=None):
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                if nodes:
+                    self._insert_nodes(nodes, cursor)
+                if node_props:
+                    self._insert_node_props(node_props, cursor)
+                if node_key_tuple:
+                    self._write_tuple(cursor, node_key_tuple[0], node_key_tuple[1])
+                if edges:
+                    self._insert_edges(edges, cursor)
+
     def create_or_reset_graph(self):
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
@@ -248,16 +313,8 @@ class MProvConnection:
     def store_agent(self, agent_name):
         # type: (str) -> str
         agent_key = self._get_qname(self.user_token)
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'AGENT') ON CONFLICT DO NOTHING", \
-                    (agent_key,self.get_graph()))
-
-                key = self._get_qname('agent_name')
-                value = self.user_token
-
-                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
-                    (agent_key, self.get_graph(), key, value))
+        node_prop_values = [self._string_node_prop(agent_key, self._get_qname('agent_name'), self.user_token, 0, code='S')]
+        self._insert_subgraph(nodes=[(agent_key, 'AGENT')], node_props=node_prop_values)
 
         logging.debug('Storing AGENT %s' % str(self.user_token))
 
@@ -267,7 +324,7 @@ class MProvConnection:
                        activity,
                        start,
                        end,
-                       location= None):
+                       location=None):
         # type: (str, int, int, int) -> str
         """
         Create an entity node for an activity (a stream operator computation)
@@ -279,35 +336,15 @@ class MProvConnection:
         :return:
         """
         node_key = self.get_activity_id(activity,location)#self._get_qname(self.get_activity_id(activity,location))
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ACTIVITY') ON CONFLICT DO NOTHING", \
-                    (node_key,self.get_graph()))
-
-                key = self._get_qname('hash')
-                value = activity
-
-                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
-                    (node_key, self.get_graph(), key, value))
-
-                key = self._get_qname('agent')
-                value = self.get_username()
-
-                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',1) ON CONFLICT DO NOTHING", \
-                    (node_key, self.get_graph(), key, value))
-
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES((%s),(%s),(%s),'wasAssociatedWith') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(),node_key,self._get_qname(value)))
-
-                key = self._get_qname('provDmStartTime')
-                value = datetime.datetime.now()
-                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',2) ON CONFLICT DO NOTHING", \
-                    (node_key, self.get_graph(), key, value))
-                key = self._get_qname('provDmEndTime')
-                value = datetime.datetime.now()
-                cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',3) ON CONFLICT DO NOTHING", \
-                    (node_key, self.get_graph(), key, value))
-
+        node_prop_values = [
+            self._string_node_prop(node_key, self._get_qname('hash'), activity, 0, code='S'),
+            self._string_node_prop(node_key, self._get_qname('agent'), self.get_username(), 1, code='S'),
+            self._timestamp_node_prop(node_key, self._get_qname('provDmStartTime'), datetime.datetime.now(), 2, code='S'),
+            self._timestamp_node_prop(node_key, self._get_qname('provDmEndTime'), datetime.datetime.now(), 3, code='S')
+        ]
+        self._insert_subgraph(nodes=[(node_key, 'ACTIVITY')],
+                              node_props=node_prop_values,
+                              edges=[(node_key, self._get_qname(self.get_username()), 'wasAssociatedWith')])
 
         token = node_key
 
@@ -315,41 +352,34 @@ class MProvConnection:
 
         return token
 
-    def _write_tuple(self, cursor, resource, node, tuple):
+    def _write_tuple(self, cursor, node, tuple):
+        prop_values = []
         if isinstance(tuple, BasicTuple):
             for i, k in enumerate(tuple.schema.fields):
                 v = tuple[k]
                 if isinstance(v, int):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append((self._int_node_prop(node, k, v, i)))
                 elif isinstance(v, float):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append(self._float_node_prop(node, k, v, i))
                 elif isinstance(v, datetime.datetime):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append(self._timestamp_node_prop(node, k, v, i))
                 else:
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
-
-                i = i + 1
+                    prop_values.append(self._string_node_prop(node, k, v, i))
         else:
             i = 0
             for k,v in tuple.items():
                 if isinstance(v, int):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append((self._int_node_prop(node, k, v, i)))
                 elif isinstance(v, float):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append(self._float_node_prop(node, k, v, i))
                 elif isinstance(v, datetime.datetime):
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append(self._timestamp_node_prop(node, k, v, i))
                 else:
-                    cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-                        (node, resource, k, v))
+                    prop_values.append(self._string_node_prop(node, k, v, i))
 
                 i = i + 1
+        
+        self._insert_node_props(prop_values, cursor)
 
     def store_stream_tuple(self, stream_name, stream_index, input_tuple):
         # type: (str, int, BasicTuple) -> str
@@ -376,12 +406,7 @@ class MProvConnection:
         else:
             input_tuple[self._get_qname("prov")] = self.get_entity_id(stream_name, stream_index)
 
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                    (token,self.get_graph()))
-
-                self._write_tuple(cursor, self.get_graph(), token, input_tuple)
+        self._insert_subgraph(nodes=[(token, 'ENTITY')], node_key_tuple=(token, input_tuple))
 
         logging.debug('Storing ENTITY ' + str(token))
 
@@ -407,12 +432,7 @@ class MProvConnection:
         # Now we'll create a tuple within the provenance node, to capture the data
         data = {self._get_qname("prov"): token, 'code': code, 'type': 'python3'}
 
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                    (token,self.get_graph()))
-
-                self._write_tuple(cursor, self.get_graph(), token, data)
+        self._insert_subgraph(nodes=[(token, 'ENTITY')], node_key_tuple=(token, data))
 
         logging.debug('Storing ENTITY ' + str(token))
 
@@ -443,18 +463,12 @@ class MProvConnection:
         return ann_tokens
 
     def _write_annot(self, ann_token, node_token, attributes):
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                    (ann_token,self.get_graph()))
-                # Then we add a relationship edge (of type ANNOTATED)
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'_annotated') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(),ann_token,node_token))
-                logging.debug('Wrote ANNOT edge %s' % ann_token)
+        self._insert_subgraph(nodes=[(ann_token, 'ENTITY')],
+                    edges=[(ann_token, node_token, '_annotated')],
+                    node_key_tuple=(ann_token, attributes))
+        logging.debug('Wrote ANNOT edge %s' % ann_token)
 
-                # Write the annotation tuple
-                self._write_tuple(cursor, self.get_graph(), ann_token, attributes)
-
+  
 
     def store_annotation(self,
                          stream_name,
@@ -508,20 +522,14 @@ class MProvConnection:
         else:
             window_token = self.get_token_qname(self.get_window_id(output_stream_name, output_stream_index))
 
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
-                    (window_token,self.get_graph()))
+        edge_values = []
+        for token in input_tokens_list:
+            token_qname = self.get_token_qname(token)
+            edge_values.append((window_token, token_qname, 'hadMember'))
 
-                logging.debug('Storing COLLECTION %s' % str(window_token))
+        logging.debug('Storing COLLECTION %s' % str(window_token))
 
-                for token in input_tokens_list:
-                    # Add a relationship edge (of type ANNOTATED)
-                    # from window to its inputs
-                    token_qname = self.get_token_qname(token)
-
-                    cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
-                        (self.get_graph(), window_token, token_qname))
+        self._insert_subgraph(nodes=[(window_token, 'COLLECTION')], edges=edge_values)
 
         return window_token
 
@@ -551,17 +559,12 @@ class MProvConnection:
         result_token = self.store_stream_tuple(output_stream_name, output_stream_index, output_tuple)
 
         activity_token = self.store_activity(activity, start, end, output_stream_index)
-
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), result_token, input_token))
-
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), activity_token, input_token))
-
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), result_token, activity_token))
+        edge_values = [
+            (result_token, input_token, 'wasDerivedFrom'),
+            (activity_token, input_token, 'used'),
+            (result_token, activity_token, 'wasGeneratedBy')
+        ]
+        self._insert_subgraph(edges=edge_values)
 
         logging.debug('Storing DERIVATION %s', result_token)
         return result_token
@@ -579,18 +582,9 @@ class MProvConnection:
         :return:
         """
         token = self.get_token_qname(self.get_entity_id(collection_name, collection_version))
-
+        edges = [(token, prior_token, 'wasDerivedFrom')] if prior_token else None
         # Create a node for the collection
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
-                    (token,self.get_graph()))
-
-        if prior_token:
-            with self.graph_conn as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                        (self.get_graph(), token, prior_token))
+        self._insert_subgraph(nodes=[(token, 'COLLECTION')], edges=edges)
 
         return token
 
@@ -603,10 +597,7 @@ class MProvConnection:
         :param collection_token:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), collection_token, tuple_token))
+        self._insert_subgraph(edges=[(collection_token, tuple_token, 'hadMember')])
 
     def store_windowed_result(self,
                               output_stream_name,
@@ -636,15 +627,12 @@ class MProvConnection:
 
         activity_token = self.store_activity(activity, start, end, output_stream_index)
 
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), result_token, window_token))
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), activity_token, window_token))
-
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), result_token, activity_token))
+        edge_values = [
+            (result_token, window_token, 'wasDerivedFrom'),
+            (activity_token, window_token, 'used'),
+            (result_token, activity_token, 'wasGeneratedBy')
+        ]
+        self._insert_subgraph(edges=edge_values)
 
         return result_token
 
@@ -656,10 +644,7 @@ class MProvConnection:
         :param source_node:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), derived_node, source_node))
+        self._insert_subgraph(edges=[(derived_node, source_node, 'wasDerivedFrom')])
 
     def store_used(self, activity_node, input_node):
         # types: (str, str) -> str
@@ -669,10 +654,7 @@ class MProvConnection:
         :param input_node:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), activity_node, input_node))
+        self._insert_subgraph(edges=[(activity_node, input_node, 'used')])
 
     def store_generated_by(self, output_node, activity_node):
         # types: (str, str) -> str
@@ -683,10 +665,7 @@ class MProvConnection:
         :param activity_node:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                    (self.get_graph(), output_node, activity_node))
+        self._insert_subgraph(edges=[(output_node, activity_node, 'wasGeneratedBy')])
 
     def _get_qname(self, local_part):
         # types: (str) -> str
