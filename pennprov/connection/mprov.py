@@ -153,7 +153,7 @@ class MProvConnection:
     def create_or_reset_graph(self):
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (self.get_graph(),))
+                cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (self.get_graph(),))
         try:
             self.store_agent(self.get_username())
         except psycopg2.errors.UniqueViolation:

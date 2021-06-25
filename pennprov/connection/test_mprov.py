@@ -34,19 +34,23 @@ class TestMProv:
         edge_prop_count = None
         with self.conn.graph_conn as db_conn:
             with db_conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM MProvNode WHERE _resource = %s", self.conn.get_graph())
+                cursor.execute("SELECT COUNT(*) FROM MProv_Node WHERE _resource = %s", (self.conn.get_graph(),))
                 node_count = cursor.fetchall()
-                cursor.execute("SELECT COUNT(*) FROM MProvNodeProp WHERE _resource = %s", self.conn.get_graph())
+                cursor.execute("SELECT COUNT(*) FROM MProv_NodeProp WHERE _resource = %s", (self.conn.get_graph(),))
                 node_prop_count = cursor.fetchall()
-                cursor.execute("SELECT COUNT(*) FROM MProvEdge WHERE _resource = %s", self.conn.get_graph())
+                cursor.execute("SELECT COUNT(*) FROM MProv_Edge WHERE _resource = %s", (self.conn.get_graph(),))
                 edge_count = cursor.fetchall()
-                cursor.execute("SELECT COUNT(*) FROM MProvEdgeProp WHERE _resource = %s", self.conn.get_graph())
+                cursor.execute("SELECT COUNT(*) FROM MProv_EdgeProp WHERE _resource = %s", (self.conn.get_graph(),))
                 edge_prop_count = cursor.fetchall()
 
-        assert node_count == [(0)]
-        assert node_prop_count == [(0)]
-        assert edge_count == [(0)]
-        assert edge_prop_count == [(0)]
+        # create_or_reset_graph should delete everything, but then create a new Agent node
+        assert node_count == [(1,)]
+        assert node_prop_count == [(1,)]
+        assert edge_count == [(0,)]
+        assert edge_prop_count == [(0,)]
+
+        agent_node = self.conn.get_node(self.conn.get_username())
+        assert agent_node is not None
 
 
 
