@@ -47,23 +47,23 @@ class MProvConnection:
         :param password: Password for connection
         :param host: Host URL, or None to use localhost
         """
-        if user is None:
-            user = config.dbms.user
+        self.user = config.dbms.user if user is None else user
 
-        if password is None:
-            password = config.dbms.password
+        self.password = config.dbms.password if password is None else password
 
-        if host is None:
-            host = config.dbms.host
+        self.host = config.dbms.host if host is None else host
 
         #self.auth_conn = psycopg2.connect(host=host, database=config.dbms.auth_db, user=user, password=password)
-        self.graph_conn = psycopg2.connect(host=host, database=config.dbms.graph_db, user=user, password=password)
+        self.graph_conn = self._get_connection()
 
         self.user_token = self.get_username()
 
         self._create_tables()
         self.graph_name = config.provenance.graph
         return
+
+    def _get_connection(self):
+        return psycopg2.connect(host=self.host, database=config.dbms.graph_db, user=self.user, password=self.password)
 
     def _create_tables(self):
         """
@@ -161,16 +161,16 @@ class MProvConnection:
         execute_values(cursor, "INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES %s ON CONFLICT DO NOTHING",
                         values, template=template)
 
-    def _string_node_prop(self, key, label, value, index, code=None):
+    def _string_node_prop(self, key, label, value, index=None, code=None):
         return (key, label, value, code, None, None, None, None, None, None, index)
 
-    def _timestamp_node_prop(self, key, label, tsvalue, index, code=None):
+    def _timestamp_node_prop(self, key, label, tsvalue, index=None, code=None):
         return (key, label, None, code, None, None, None, None, None, tsvalue, index)
 
-    def _int_node_prop(self, key, label, ivalue, index, code=None):
+    def _int_node_prop(self, key, label, ivalue, index=None, code=None):
         return (key, label, None, code, ivalue, None, None, None, None, None, index)
 
-    def _float_node_prop(self, key, label, fvalue, index, code=None):
+    def _float_node_prop(self, key, label, fvalue, index=None, code=None):
         return (key, label, None, code, None, None, None, fvalue, None, None, index)
 
 
@@ -203,7 +203,7 @@ class MProvConnection:
                                                            index) VALUES %s ON CONFLICT DO NOTHING""",
                     values, template=template)
     
-    def _insert_subgraph(self, nodes=None, node_props=None, edges=None, node_key_tuple=None):
+    def _insert_subgraph_no_retry(self, nodes=None, node_props=None, edges=None, node_key_tuple=None):
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 if nodes:
@@ -214,6 +214,15 @@ class MProvConnection:
                     self._write_tuple(cursor, node_key_tuple[0], node_key_tuple[1])
                 if edges:
                     self._insert_edges(edges, cursor)
+    
+    def _insert_subgraph(self, nodes=None, node_props=None, edges=None, node_key_tuple=None):
+        try:
+            self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
+        except psycopg2.OperationalError as e:
+            print('connection closed, retrying. error:', e)
+            self.graph_conn = self._get_connection()
+            print('new connection', self.graph_conn)
+            self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
 
     def create_or_reset_graph(self):
         with self.graph_conn as conn:
@@ -313,7 +322,7 @@ class MProvConnection:
     def store_agent(self, agent_name):
         # type: (str) -> str
         agent_key = self._get_qname(self.user_token)
-        node_prop_values = [self._string_node_prop(agent_key, self._get_qname('agent_name'), self.user_token, 0, code='S')]
+        node_prop_values = [self._string_node_prop(agent_key, self._get_qname('agent_name'), self.user_token, index=0, code='S')]
         self._insert_subgraph(nodes=[(agent_key, 'AGENT')], node_props=node_prop_values)
 
         logging.debug('Storing AGENT %s' % str(self.user_token))
@@ -337,10 +346,10 @@ class MProvConnection:
         """
         node_key = self.get_activity_id(activity,location)#self._get_qname(self.get_activity_id(activity,location))
         node_prop_values = [
-            self._string_node_prop(node_key, self._get_qname('hash'), activity, 0, code='S'),
-            self._string_node_prop(node_key, self._get_qname('agent'), self.get_username(), 1, code='S'),
-            self._timestamp_node_prop(node_key, self._get_qname('provDmStartTime'), datetime.datetime.now(), 2, code='S'),
-            self._timestamp_node_prop(node_key, self._get_qname('provDmEndTime'), datetime.datetime.now(), 3, code='S')
+            self._string_node_prop(node_key, self._get_qname('hash'), activity, index=0, code='S'),
+            self._string_node_prop(node_key, self._get_qname('agent'), self.get_username(), index=1, code='S'),
+            self._timestamp_node_prop(node_key, self._get_qname('provDmStartTime'), datetime.datetime.now(), index=2, code='S'),
+            self._timestamp_node_prop(node_key, self._get_qname('provDmEndTime'), datetime.datetime.now(), index=3, code='S')
         ]
         self._insert_subgraph(nodes=[(node_key, 'ACTIVITY')],
                               node_props=node_prop_values,
@@ -358,24 +367,24 @@ class MProvConnection:
             for i, k in enumerate(tuple.schema.fields):
                 v = tuple[k]
                 if isinstance(v, int):
-                    prop_values.append((self._int_node_prop(node, k, v, i)))
+                    prop_values.append((self._int_node_prop(node, k, v)))
                 elif isinstance(v, float):
-                    prop_values.append(self._float_node_prop(node, k, v, i))
+                    prop_values.append(self._float_node_prop(node, k, v))
                 elif isinstance(v, datetime.datetime):
-                    prop_values.append(self._timestamp_node_prop(node, k, v, i))
+                    prop_values.append(self._timestamp_node_prop(node, k, v))
                 else:
-                    prop_values.append(self._string_node_prop(node, k, v, i))
+                    prop_values.append(self._string_node_prop(node, k, v))
         else:
             i = 0
             for k,v in tuple.items():
                 if isinstance(v, int):
-                    prop_values.append((self._int_node_prop(node, k, v, i)))
+                    prop_values.append((self._int_node_prop(node, k, v)))
                 elif isinstance(v, float):
-                    prop_values.append(self._float_node_prop(node, k, v, i))
+                    prop_values.append(self._float_node_prop(node, k, v))
                 elif isinstance(v, datetime.datetime):
-                    prop_values.append(self._timestamp_node_prop(node, k, v, i))
+                    prop_values.append(self._timestamp_node_prop(node, k, v))
                 else:
-                    prop_values.append(self._string_node_prop(node, k, v, i))
+                    prop_values.append(self._string_node_prop(node, k, v))
 
                 i = i + 1
         
