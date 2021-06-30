@@ -910,7 +910,7 @@ class MProvConnection:
         return
 
     def close(self):
-        return
+        self.graph_conn.close()
 
     def __del__(self):
         self.close()

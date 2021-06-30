@@ -118,3 +118,15 @@ class MProvConnectionCache:
                     id(connection),
                     connection.get_graph())
         return connection
+
+    @classmethod
+    def expire(cls, connection_key):
+        #type: (MProvConnectionCache.Key) -> None
+        """
+        Removes the connection associated with the given key, if any, from the cache and closes the connection.
+        """
+        connection = cls.connections.pop(connection_key, None)
+        if connection:
+            connection.close()
+        
+
