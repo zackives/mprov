@@ -59,17 +59,22 @@ class LogIndex:
         return len(self.binding_table) - 1
 
 class DirectWriteLogIndex(LogIndex):
+    """
+    Pass-through interface for provenance event logs
+    """
     def add_node(self, db, resource, label, skolem_args):
         # type: (cursor, str, str, str) -> int
         """
         Inserts a node into the database cursor, for the given resource, with a given label.
         The skolem_args will be the basis of the value
         """
+        logging.debug('Node: ' + label + '(' + skolem_args + ')')
         return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
             (skolem_args,resource,label))
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
+        logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
             return self.add_nodeprop_str(db, resource, node, label, value, ind)
         elif isinstance(value, int):
@@ -120,6 +125,7 @@ class DirectWriteLogIndex(LogIndex):
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
+        logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
         return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
             (resource, source, dest, label))
 
@@ -349,15 +355,11 @@ class MProvConnection:
         agent_key = self._get_qname(self.user_token)
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'AGENT') ON CONFLICT DO NOTHING", \
-                #    (agent_key,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'AGENT', agent_key)
 
                 key = self._get_qname('agent_name')
                 value = self.user_token
-
-                #cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
-                #    (agent_key, self.get_graph(), key, value))
+                
                 self.log.add_nodeprop(cursor, self.get_graph(), agent_key, key, value,0)
 
         logging.debug('Storing AGENT %s' % str(self.user_token))
@@ -382,37 +384,25 @@ class MProvConnection:
         node_key = self.get_activity_id(activity,location)#self._get_qname(self.get_activity_id(activity,location))
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ACTIVITY') ON CONFLICT DO NOTHING", \
-                #    (node_key,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'ACTIVITY', node_key)
 
                 key = self._get_qname('hash')
                 value = activity
 
-                #cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',0) ON CONFLICT DO NOTHING", \
-                #    (node_key, self.get_graph(), key, value))
                 self.log.add_nodeprop(cursor, self.get_graph(), node_key, key, value, 0)
 
                 key = self._get_qname('agent')
                 value = self.get_username()
 
-                #cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',1) ON CONFLICT DO NOTHING", \
-                #    (node_key, self.get_graph(), key, value))
                 self.log.add_nodeprop(cursor, self.get_graph(), node_key, key, value, 1)
 
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES((%s),(%s),(%s),'wasAssociatedWith') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(),node_key,self._get_qname(value)))
                 self.log.add_edge(cursor, self.get_graph(), node_key, 'wasAssociatedWith', self._get_qname(value))
 
                 key = self._get_qname('provDmStartTime')
                 value = datetime.datetime.now()
-                #cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',2) ON CONFLICT DO NOTHING", \
-                #    (node_key, self.get_graph(), key, value))
                 self.log.add_nodeprop(cursor, self.get_graph(), node_key, key, value, 2)
                 key = self._get_qname('provDmEndTime')
                 value = datetime.datetime.now()
-                #cursor.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tsvalue,code,index) VALUES(%s,%s,%s,%s,'S',3) ON CONFLICT DO NOTHING", \
-                #    (node_key, self.get_graph(), key, value))
                 self.log.add_nodeprop(cursor, self.get_graph(), node_key, key, value, 3)
 
         token = node_key
@@ -460,8 +450,6 @@ class MProvConnection:
 
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                #    (token,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'ENTITY', token)
 
                 self._write_tuple(cursor, self.get_graph(), token, input_tuple)
@@ -492,8 +480,6 @@ class MProvConnection:
 
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                #    (token,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'ENTITY', token)
 
                 self._write_tuple(cursor, self.get_graph(), token, data)
@@ -529,12 +515,8 @@ class MProvConnection:
     def _write_annot(self, ann_token, node_token, attributes):
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'ENTITY') ON CONFLICT DO NOTHING", \
-                #    (ann_token,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'ENTITY', ann_token)
                 # Then we add a relationship edge (of type ANNOTATED)
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'_annotated') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(),ann_token,node_token))
                 self.log.add_edge(cursor, self.get_graph(), ann_token, '_annotated', node_token)
                 logging.debug('Wrote ANNOT edge %s' % ann_token)
 
@@ -596,8 +578,6 @@ class MProvConnection:
 
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
-                #    (window_token,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'COLLECTION', window_token)
 
                 logging.debug('Storing COLLECTION %s' % str(window_token))
@@ -607,8 +587,6 @@ class MProvConnection:
                     # from window to its inputs
                     token_qname = self.get_token_qname(token)
 
-                    #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
-                    #    (self.get_graph(), window_token, token_qname))
                     self.log.add_edge(cursor, self.get_graph(), window_token, 'hadMember', token_qname)
 
         return window_token
@@ -642,17 +620,9 @@ class MProvConnection:
 
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), result_token, input_token))
                 self.log.add_edge(cursor, self.get_graph(), result_token, 'wasDerivedFrom', input_token)
                 self.log.add_edge(cursor, self.get_graph(), activity_token, 'used', input_token)
                 self.log.add_edge(cursor, self.get_graph(), result_token, 'wasGeneratedBy', activity_token)
-
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), activity_token, input_token))
-
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), result_token, activity_token))
 
         logging.debug('Storing DERIVATION %s', result_token)
         return result_token
@@ -674,15 +644,11 @@ class MProvConnection:
         # Create a node for the collection
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,'COLLECTION') ON CONFLICT DO NOTHING", \
-                #    (token,self.get_graph()))
                 self.log.add_node(cursor, self.get_graph(), 'COLLECTION', token)
 
         if prior_token:
             with self.graph_conn as conn:
                 with conn.cursor() as cursor:
-                    #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                    #    (self.get_graph(), token, prior_token))
                     self.log.add_edge(cursor, self.get_graph(), token, 'wasDerivedFrom', prior_token)
 
         return token
@@ -698,8 +664,6 @@ class MProvConnection:
         """
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'hadMember') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), collection_token, tuple_token))
                 self.log.add_edge(cursor, self.get_graph(), collection_token, 'hadMember', tuple_token)
 
     def store_windowed_result(self,
@@ -732,12 +696,6 @@ class MProvConnection:
 
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), result_token, window_token))
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), activity_token, window_token))
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), result_token, activity_token))
                 self.log.add_edge(cursor, self.get_graph(), result_token, 'wasDerivedFrom', window_token)
                 self.log.add_edge(cursor, self.get_graph(), activity_token, 'used', window_token)
                 self.log.add_edge(cursor, self.get_graph(), result_token, 'wasGeneratedBy', activity_token)
@@ -754,8 +712,6 @@ class MProvConnection:
         """
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasDerivedFrom') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), derived_node, source_node))
                 self.log.add_edge(cursor, self.get_graph(), derived_node, 'wasDerivedFrom', source_node)
 
     def store_used(self, activity_node, input_node):
@@ -766,11 +722,7 @@ class MProvConnection:
         :param input_node:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'used') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), activity_node, input_node))
-                self.log.add_edge(cursor, self.get_graph(), activity_node, 'used', input_node)
+        self.log.add_edge(self.graph_conn.cursor(), self.get_graph(), activity_node, 'used', input_node)
 
     def store_generated_by(self, output_node, activity_node):
         # types: (str, str) -> str
@@ -781,11 +733,7 @@ class MProvConnection:
         :param activity_node:
         :return:
         """
-        with self.graph_conn as conn:
-            with conn.cursor() as cursor:
-                #cursor.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,'wasGeneratedBy') ON CONFLICT DO NOTHING", \
-                #    (self.get_graph(), output_node, activity_node))
-                self.log.add_edge(cursor, self.get_graph(), output_node, 'wasGeneratedBy', activity_node)
+        self.log.add_edge(self.graph_conn.cursor(), self.get_graph(), output_node, 'wasGeneratedBy', activity_node)
 
     def _get_qname(self, local_part):
         # types: (str) -> str
