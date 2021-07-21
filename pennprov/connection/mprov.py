@@ -21,42 +21,32 @@ import pennprov
 import datetime
 from pennprov.metadata.stream_metadata import BasicTuple
 
+from suffix_tree import Tree
+
 import psycopg2
 from psycopg2.extensions import cursor
 from pennprov.config import config
 
 class LogIndex:
-    # Basic format:
-    # index -> (op_type, (tokens))
-    #   op_type is one of: n(add_node), e(add_edge), p(add_prop), r(repeat), 2(seq_2), f(for), s(span)
-    #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
-    #   f(p_index,index), s(start_p_index,stop_p_index,index)
-    compression_table = [('n',(0))]
-    # token: (index, tok, binding_p1, prior_binding), ...
-    binding_table = []
-    # p_index: pred
-    pred_table = []
-
-    # Inverse mapping from binding to index in binding table
-    binding_to_index = {}
-
-    # Log compression window
-    recent_history = []
 
     def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> int
-        ind = 0     # always use (n, 0)? TODO: expand to include repetition
-        self.node_to_index[skolem_args] = ind
-        # TODO: push item to binding table
-        return len(self.binding_table) - 1
+        return 1
 
     def add_edge(self, db, resource, source, label, dest):
-        # type: (cursor, str, str, str, str) -> int
-        return len(self.binding_table) - 1
+       return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, Any, int) -> int
-        return len(self.binding_table) - 1
+        return 1
+
+# TO DO:
+#  stream the update log
+#  set epoch
+#  build a suffix trie for the epoch
+#  for each item
+#    append to the string
+#    replay suffixes up to max length
+#    reuse extent at LCS
+#    for each longer suffix, point to prior extent
 
 class DirectWriteLogIndex(LogIndex):
     """
@@ -129,6 +119,92 @@ class DirectWriteLogIndex(LogIndex):
         return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
             (resource, source, dest, label))
 
+class CompressingLogIndex(LogIndex):
+    # Basic format:
+    # index -> (op_type, (tokens))
+    #   op_type is one of: n(add_node), e(add_edge), p(add_prop), r(repeat), 2(seq_2), f(for), s(span)
+    #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
+    #   f(p_index,index), s(start_p_index,stop_p_index,index)
+    compression_table = [('n',(0))]
+    # token: (index, tok, binding_p1, prior_binding), ...
+    binding_table = []
+    # p_index: pred
+    pred_table = []
+
+    # Inverse mapping from binding to index in binding table
+    binding_to_index = {}
+
+    # Log compression window
+    recent_history = []
+
+    op_history = []
+    binding_history = []
+
+    chain = {'last': []}
+
+    tree = Tree ()
+
+    real_index = DirectWriteLogIndex()
+    last_node = None
+
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, str) -> int
+        ind = 0     # always use (n, 0)? TODO: expand to include repetition
+        self.binding_to_index[skolem_args] = ind
+        # TODO: push item to binding table
+        #return len(self.binding_table) - 1
+        self._add_log_event(('N',label),(skolem_args))
+        return self.real_index.add_node(db, resource, label, skolem_args)
+
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> int
+        #return len(self.binding_table) - 1
+        self._add_log_event(('E',label),(source,dest))
+        return self.real_index.add_edge(db, resource, source, label, dest)
+
+    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, Any, int) -> int
+        #return len(self.binding_table) - 1
+        self._add_log_event(('P',label,ind),(node,value))
+        return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
+
+    def _add_binding(self, log_id, binding_tuple):
+        self.binding_history.append((log_id, binding_tuple))
+
+    def _add_log_event(self, log_tuple, binding_tuple):
+        self.op_history.append(log_tuple)
+
+        found = False
+        end = len(self.op_history)
+        for i in range (0, end):
+            if self.tree.find(self.op_history[end-i-1:]):
+                found = True
+                self.op_history = self.op_history[end-i-1:]
+                break
+
+        # TODO: find lcs
+            
+        if found:#self.tree.find(self.op_history):
+            #found = True
+            # Compression here, need to capture the last item
+            for id,path in self.tree.find_all(self.op_history):
+                last_node = id
+                break
+            #self.op_history = self.op_history[start]
+            #logging.warning(str(self.op_history) + ' repeats ' + str(last_node) + '||' + str(self.chain['last']))
+            self.chain['last'] = [last_node] + self.chain['last']
+        else:
+            # Flush
+            if len(self.chain['last']):
+                logging.warning('Flush sequence ' + str(self.chain['last']))
+            last_node = len(self.binding_history)
+            self.tree.add(len(self.binding_history), self.op_history)
+            logging.warning(str(self.op_history) + ' assigned to ' + str(last_node))
+            self.chain['last'] = []
+            # TODO: Log an entry from binding to
+        
+        self._add_binding(last_node, binding_tuple)
+        logging.debug(str(log_tuple) + ': ' + str(binding_tuple))
 
 class MProvConnection:
     graph_name = None
@@ -136,7 +212,8 @@ class MProvConnection:
     default_host = "localhost"
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
 
-    log = DirectWriteLogIndex()
+    #log = DirectWriteLogIndex()
+    log = CompressingLogIndex()
 
     """
     MProvConnection is a high-level API to the PennProvenance framework, with

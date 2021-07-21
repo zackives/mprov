@@ -22,6 +22,7 @@ from pennprov.api.permission_api import PermissionApi
 # import ApiClient
 from pennprov.api_client import ApiClient
 from pennprov.configuration import Configuration
+from pennprov.models.response_error import ResponseError
 from pennprov.models.user_credentials import UserCredentials
 from pennprov.models.user_info import UserInfo
 from pennprov.models.web_token import WebToken
