@@ -127,10 +127,10 @@ class DirectWriteLogIndex(LogIndex):
 
 class CachingLogIndex(DirectWriteLogIndex):
     MAX_ELEMENTS = 1048576
-    done = {''}
-    nodeprop_pool = []
-    node_pool = []
-    edge_pool = []
+    done = set()
+    nodeprop_pool = set()
+    node_pool = set()
+    edge_pool = set()
 
     def flush(self, db):
         if len(self.node_pool) > 0:
@@ -174,7 +174,7 @@ class CachingLogIndex(DirectWriteLogIndex):
         # return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
         #     (skolem_args,resource,label))
         ins_str = (skolem_args,resource,label)
-        self.node_pool.append(ins_str)
+        self.node_pool.add(ins_str)
         if len(self.node_pool) > self.MAX_ELEMENTS:
             self._write_nodes()
 
@@ -182,52 +182,34 @@ class CachingLogIndex(DirectWriteLogIndex):
         # type: (cursor, str, str, str, str, int) -> int
         ins_str = (node,resource,None,label,value,'S',None,None,None,None,None, None, ind)
         #if ins_str not in self.done:
-        self.nodeprop_pool.append(ins_str)
+        self.nodeprop_pool.add(ins_str)
             #self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops()
 
     def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, int, int) -> int
-        # if ind:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value, ind))
-        # else:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value))
         ins_str = (node,resource,None,label,None,'I',value,None,None,None,None, None, ind)
         #if ins_str not in self.done:
-        self.nodeprop_pool.append(ins_str)
+        self.nodeprop_pool.add(ins_str)
         #    self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops()
 
     def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, float, int) -> int
-        # if ind:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value, ind))
-        # else:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value))
         ins_str = (node,resource,None,label,None,'F',None,None,None,value,None, None, ind)
         #if ins_str not in self.done:
-        self.nodeprop_pool.append(ins_str)
+        self.nodeprop_pool.add(ins_str)
         #    self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops()
 
     def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, datetime.datetime, int) -> int
-        # if ind:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value, ind))
-        # else:
-        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
-        #         (node, resource, label, value))
         ins_str = (node,resource,None,label,None,'T',None,None,None,None,value, None, ind)
         #if ins_str not in self.done:
-        self.nodeprop_pool.append(ins_str)
+        self.nodeprop_pool.add(ins_str)
         #    self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops()
@@ -235,10 +217,8 @@ class CachingLogIndex(DirectWriteLogIndex):
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
         logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
-        # return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-        #     (resource, source, dest, label))    
         ins_str = (resource, source, dest, label)
-        self.edge_pool.append(ins_str)
+        self.edge_pool.add(ins_str)
         if len(self.edge_pool) > self.MAX_ELEMENTS:
             self._write_edges()
 
