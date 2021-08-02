@@ -21,11 +21,13 @@ import pennprov
 import datetime
 from pennprov.metadata.stream_metadata import BasicTuple
 
+from io import StringIO
 from suffix_tree import Tree
 
 import psycopg2
 from psycopg2.extensions import cursor
 from pennprov.config import config
+from psycopg2.extras import execute_values
 
 class LogIndex:
 
@@ -118,6 +120,127 @@ class DirectWriteLogIndex(LogIndex):
         logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
         return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
             (resource, source, dest, label))
+
+    def flush(self):
+        return
+
+
+class CachingLogIndex(DirectWriteLogIndex):
+    MAX_ELEMENTS = 1048576
+    done = {''}
+    nodeprop_pool = []
+    node_pool = []
+    edge_pool = []
+
+    def flush(self, db):
+        if len(self.node_pool) > 0:
+            print('Flushing nodes...')
+            self._write_nodes(db)
+        if len(self.edge_pool) > 0:
+            print('Flushing edges...')
+            self._write_edges(db)
+        if len(self.nodeprop_pool) > 0:
+            print('Flushing node properties...')
+            self._write_nodeprops(db)
+
+    def _write_nodes(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_Node(_key,_resource,label) VALUES %s ON CONFLICT DO NOTHING", \
+            self.node_pool)
+        self.node_pool.clear()
+        return 1
+
+    def _write_edges(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES %s ON CONFLICT DO NOTHING", \
+            self.edge_pool)
+        self.edge_pool.clear()
+        return
+
+    def _write_nodeprops(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_NodeProp(_key,_resource,type,label,value,code,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,index) VALUES %s ON CONFLICT DO NOTHING", \
+            self.nodeprop_pool)
+        self.nodeprop_pool.clear()
+        return
+
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, str) -> int
+        """
+        Inserts a node into the database cursor, for the given resource, with a given label.
+        The skolem_args will be the basis of the value
+        """
+        logging.debug('Node: ' + label + '(' + skolem_args + ')')
+        # return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
+        #     (skolem_args,resource,label))
+        ins_str = (skolem_args,resource,label)
+        self.node_pool.append(ins_str)
+        if len(self.node_pool) > self.MAX_ELEMENTS:
+            self._write_nodes()
+
+    def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, str, int) -> int
+        ins_str = (node,resource,None,label,value,'S',None,None,None,None,None, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.append(ins_str)
+            #self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops()
+
+    def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, int, int) -> int
+        # if ind:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value, ind))
+        # else:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value))
+        ins_str = (node,resource,None,label,None,'I',value,None,None,None,None, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.append(ins_str)
+        #    self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops()
+
+    def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, float, int) -> int
+        # if ind:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value, ind))
+        # else:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value))
+        ins_str = (node,resource,None,label,None,'F',None,None,None,value,None, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.append(ins_str)
+        #    self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops()
+
+    def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, datetime.datetime, int) -> int
+        # if ind:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value, ind))
+        # else:
+        #     return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
+        #         (node, resource, label, value))
+        ins_str = (node,resource,None,label,None,'T',None,None,None,None,value, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.append(ins_str)
+        #    self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops()
+
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> int
+        logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
+        # return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+        #     (resource, source, dest, label))    
+        ins_str = (resource, source, dest, label)
+        self.edge_pool.append(ins_str)
+        if len(self.edge_pool) > self.MAX_ELEMENTS:
+            self._write_edges()
 
 class CompressingLogIndex(LogIndex):
     # Basic format:
@@ -212,8 +335,10 @@ class MProvConnection:
     default_host = "localhost"
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
 
+    #log = NoDbLogIndex()
     #log = DirectWriteLogIndex()
-    log = CompressingLogIndex()
+    log = CachingLogIndex()
+    #log = CompressingLogIndex()
 
     """
     MProvConnection is a high-level API to the PennProvenance framework, with
@@ -252,7 +377,7 @@ class MProvConnection:
         """
 
         node_table = """
-                     CREATE TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
                                                            _created SERIAL,
                                                            label VARCHAR(80),
@@ -260,7 +385,90 @@ class MProvConnection:
                      """
 
         node_props_table = """
-                     CREATE TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           type VARCHAR(80),
+                                                           label VARCHAR(80),
+                                                           value VARCHAR,
+                                                           code CHAR(1),
+                                                           ivalue INTEGER,
+                                                           lvalue BIGINT,
+                                                           dvalue DOUBLE PRECISION,
+                                                           fvalue REAL,
+                                                           tvalue DATE,
+                                                           tsvalue TIMESTAMP,
+                                                           index BIGINT,
+                                                           PRIMARY KEY(_resource, _key, label),
+                                                           UNIQUE(_resource,_key,index)
+                                                           )
+                           """
+
+        edge_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _from VARCHAR(80) NOT NULL,
+                                                           _to VARCHAR(80) NOT NULL,
+                                                           label VARCHAR(80),
+                                                           PRIMARY KEY(_resource, _key),
+                                                           UNIQUE(_resource, _from, _to, label)
+                                                           )
+                     """
+
+        edge_props_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _created SERIAL,
+                                                           type VARCHAR(80),
+                                                           label VARCHAR(80),
+                                                           value VARCHAR,
+                                                           code CHAR(1),
+                                                           ivalue INTEGER,
+                                                           lvalue BIGINT,
+                                                           dvalue DOUBLE PRECISION,
+                                                           fvalue REAL,
+                                                           tvalue DATE,
+                                                           tsvalue TIMESTAMP,
+                                                           index BIGINT,
+                                                           PRIMARY KEY(_resource, _key, label),
+                                                           UNIQUE(_resource,_key,index)
+                                                           )
+                           """
+
+        schema_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           name VARCHAR(80) NOT NULL,
+                                                           value VARCHAR,
+                                                           PRIMARY KEY(_resource, _key),
+                                                           UNIQUE(_resource, name)
+                                                           )
+                       """
+
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                #cursor.execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED ')
+                cursor.execute(node_table)
+                cursor.execute(node_props_table)
+                cursor.execute(edge_table)
+                cursor.execute(edge_props_table)
+                cursor.execute(schema_table)
+        return
+
+    def _create_tables_with_fkeys(self):
+        """
+        Create the graph relations if need be
+        """
+
+        node_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _created SERIAL,
+                                                           label VARCHAR(80),
+                                                           PRIMARY KEY(_resource, _key))
+                     """
+
+        node_props_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
                                                            type VARCHAR(80),
                                                            label VARCHAR(80),
@@ -280,7 +488,7 @@ class MProvConnection:
                            """
 
         edge_table = """
-                     CREATE TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
                                                            _resource VARCHAR(80) NOT NULL,
                                                            _from VARCHAR(80) NOT NULL,
                                                            _to VARCHAR(80) NOT NULL,
@@ -294,7 +502,7 @@ class MProvConnection:
                      """
 
         edge_props_table = """
-                     CREATE TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
                                                            _created SERIAL,
                                                            type VARCHAR(80),
@@ -315,7 +523,7 @@ class MProvConnection:
                            """
 
         schema_table = """
-                     CREATE TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
                                                            name VARCHAR(80) NOT NULL,
                                                            value VARCHAR,
@@ -333,9 +541,12 @@ class MProvConnection:
         return
     
     def create_or_reset_graph(self):
+        print ('Clearing graph...')
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (self.get_graph(),))
+                cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (self.get_graph(),))
+                cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (self.get_graph(),))
         try:
             self.store_agent(self.get_username())
         except psycopg2.errors.UniqueViolation:
@@ -933,6 +1144,7 @@ class MProvConnection:
         return results
 
     def get_stream_inputs(self, stream_name):
+        # type: (str) -> List[str]
         inputs = []
 
         stream_node = self.get_token_qname(self.get_entity_id(stream_name))
@@ -943,6 +1155,7 @@ class MProvConnection:
         return inputs
 
     def get_stream_producers(self, stream_name):
+        # type: (str) -> List[str]
         producers = []
         stream_node = self.get_token_qname(self.get_entity_id(stream_name))
 
@@ -959,7 +1172,7 @@ class MProvConnection:
 
     @classmethod
     def get_local_part(cls, token_value):
-        # types (str) -> str
+        # type: (str) -> str
         """
         Returns a QualifiedName by parsing the given string as a namespace and local part
         :param token_value: a string of the form '{' + namespace + '}' + local_part
@@ -972,6 +1185,7 @@ class MProvConnection:
 
     def get_provenance_data(self, resource, token):
         # type: (str, str) -> List[Dict]
+        self.flush()
         ret = []
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
@@ -1008,6 +1222,7 @@ class MProvConnection:
 
     def get_connected_to(self, resource, token, label1):
         # type: (str, str, str) -> List[pennprov.ProvTokenSetModel]
+        self.flush()
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 if label1 is None:
@@ -1020,6 +1235,7 @@ class MProvConnection:
 
     def get_connected_from(self, resource, token, label1):
         # type: (str, str, str) -> List[pennprov.ProvTokenSetModel]
+        self.flush()
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 if label1 is None:
@@ -1031,9 +1247,14 @@ class MProvConnection:
         return []
 
     def flush(self):
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                self.log.flush(cursor)
+            conn.commit()
         return
 
     def close(self):
+        self.flush()
         return
 
     def __del__(self):
