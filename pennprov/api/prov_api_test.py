@@ -105,7 +105,7 @@ def test_at_scale():
     rows = []
     inx = 0
     start = datetime.now()
-    for i in range(0, 10):
+    for i in range(0, 100):
         for j in range(0, 10):
             rows = rows + [{'id': inx, 'x': i, 'y': j}]
             ecg = pd.DataFrame(rows)
