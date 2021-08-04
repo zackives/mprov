@@ -217,12 +217,19 @@ class MProvConnection:
     
     def _insert_subgraph(self, nodes=None, node_props=None, edges=None, node_key_tuple=None):
         try:
-            self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
-        except psycopg2.OperationalError as e:
-            print('connection closed, retrying. error:', e)
-            self.graph_conn = self._get_connection()
-            print('new connection', self.graph_conn)
-            self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
+            try:
+                self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                import os
+                eid = f'{os.getpid()}_{id(self)}'
+                logging.warning(f'connection {eid} {self.graph_conn} closed, retrying. error: {e}', exc_info=True)
+                self.graph_conn = self._get_connection()
+                logging.warning(f'new connection {eid} {self.graph_conn}')
+                self._insert_subgraph_no_retry(nodes=nodes, node_props=node_props, edges=edges, node_key_tuple=node_key_tuple)
+        except Exception as e:
+                import os
+                eid = f'{os.getpid()}_{id(self)}'
+                logging.warning(f'failure {eid} {self.graph_conn}: {e}', exc_info=True)
 
     def create_or_reset_graph(self):
         with self.graph_conn as conn:

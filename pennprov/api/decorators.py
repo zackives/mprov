@@ -2,7 +2,7 @@ import logging
 import sys
 import traceback
 from datetime import timezone, datetime
-from functools import wraps
+from functools import wraps, partial
 
 from pennprov.connection.mprov import MProvConnection
 from pennprov.connection.mprov_connection_cache import MProvConnectionCache
@@ -82,14 +82,17 @@ class MProvAgg:
             d = (inspect.getsource(func))
             logging.debug('Read source of %s as %s', func.__name__, d)
 
+        # pandas_udf with function type GROUPED_MAP have either one arg: (data), or two (key, data)
+        args_count = len(inspect.getfullargspec(func)[0])
+
         @wraps(func)
-        def wrapper(arg):
+        def wrapper(key, data):
             #args_repr = [md_key(a, in_stream_key) for a in args]
             #kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
             #signature = ", ".join(args_repr + kwargs_repr)
             #print(f"Calling {func.__name__}({signature})")
 
-            val = func(arg)#*args, **kwargs)
+            val = func(key, data) if args_count > 1 else func(data)
 
             mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
 
@@ -121,7 +124,7 @@ class MProvAgg:
             ts = datetime.now(timezone.utc)
             if mprov_conn:
                 try:
-                    for t in self.rel_keys(arg, self.in_stream_key):
+                    for t in self.rel_keys(data, self.in_stream_key):
                         #print('Input: %s' %self.in_stream_name + str([t[k] for k in self.in_stream_key]))
                         window_ids.append(get_entity_id(self.in_stream_name, [t[k] for k in self.in_stream_key]))
 
@@ -161,7 +164,7 @@ class MProvAgg:
                 logging.warning("Output: %s.%s <(%s)- %s", self.out_stream_name, 'w'+str(out_keys), sig, str(window_ids))
 
             return val
-        return wrapper
+        return wrapper if args_count > 1 else partial(wrapper, None)
 
 #if __name__ == '__main__':
 
