@@ -1,0 +1,2 @@
+include pennprov/config/config.yaml
+global-exclude *.pyc
