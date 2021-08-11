@@ -24,7 +24,7 @@ from pennprov.metadata.stream_metadata import BasicTuple
 import psycopg2
 from pennprov.config import config
 
-from pennprov.connection.dblayer import LogIndex
+from pennprov.connection.dblayer import ProvenanceStore
 
 class MProvConnection:
     graph_name = None
@@ -33,7 +33,7 @@ class MProvConnection:
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
 
     #log = LogIndex()
-    log = LogIndex.get_index()
+    log = ProvenanceStore.get_index()
     #log = CompressingLogIndex()
 
     """
@@ -732,6 +732,36 @@ class MProvConnection:
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 return self.log.get_connected_from(cursor, resource, token, label1)
+
+    def _cleanup(self, str):
+        #type: (str) -> str
+        return str.replace('{http://mprov.md2k.org}','')
+
+    def _get_color(self, label):
+        #type: (str) -> str
+        if label == 'ENTITY':
+            return 'red'
+        elif label == 'COLLECTION':
+            return 'darkorange'
+        elif label == 'AGENT':
+            return 'blue'
+        elif label == 'ACTIVITY':
+            return 'green'
+        else:
+            return 'black'
+
+    def get_dot(self):
+        self.flush()
+        dot = "digraph {\n"
+        dot += "ENTITY [color=red]\nAGENT [color=blue]\nCOLLECTION [color=darkorange]\nACTIVITY [color=green]\n"
+        with self.graph_conn as conn:
+            with conn.cursor() as cursor:
+                for node in self.log.get_nodes(cursor,self.get_graph()):
+                    dot += '"%s" [color=%s]\n'%(self._cleanup(node['id']), self._get_color(node['label']))
+                for edge in self.log.get_edges(cursor,self.get_graph()):
+                    dot += '"%s" -> "%s" [label="%s"]\n'%(self._cleanup(edge[0]), self._cleanup(edge[2]), self._cleanup(edge[1]))
+
+        return dot + "}"
 
     def flush(self):
         with self.graph_conn as conn:

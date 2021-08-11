@@ -1,24 +1,43 @@
+"""
+ Copyright 2021 Trustees of the University of Pennsylvania
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ http://www.apache.org/licenses/LICENSE-2.0
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
 from __future__ import print_function
 
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Tuple
 import logging
 import pennprov
 import datetime
 
+import uuid
+from uuid import UUID
+
 from suffix_tree import Tree
 
-import psycopg2
 from psycopg2.extensions import cursor
 from psycopg2.extras import execute_values
+import psycopg2.extras
 
-class LogIndex:
+class ProvenanceStore:
+    """
+    A persistent provenance graph storage subsystem.
+    """
 
     def get_index():
-        # type: () -> LogIndex
+        # type: () -> ProvenanceStore
         """
         Retrieve the appropriate provenance indexing subsystem
         """
-        return CachingLogIndex()
+        return SQLProvenanceStore()
         #return CompressingLogIndex(CachingLogIndex())
 
     def add_node(self, db, resource, label, skolem_args):
@@ -56,6 +75,14 @@ class LogIndex:
         # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
         return
 
+    def get_edges(self, db, resource):
+        #type: (cursor, str) -> List[Tuple]
+        return []
+
+    def get_nodes(self, db, resource):
+        #type: (cursor, str) -> List[Dict]
+        return []
+
 # TO DO:
 #  stream the update log
 #  set epoch
@@ -66,7 +93,11 @@ class LogIndex:
 #    reuse extent at LCS
 #    for each longer suffix, point to prior extent
 
-class DirectWriteLogIndex(LogIndex):
+class SQLProvenanceStore(ProvenanceStore):
+    """
+    Writes the provenance graph to a PostgreSQL back-end.
+    """
+
     def create_tables(self, cursor):
         # type: (cursor) -> None
         node_table = """
@@ -270,12 +301,433 @@ class DirectWriteLogIndex(LogIndex):
                             (resource, token, label1))
         return [x[0] for x in db.fetchall()]
 
+    def get_edges(self, db, resource):
+        #type: (cursor, str) -> List[Tuple]
+        self.flush(db)
+        db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
+
+        return [(x[0],x[1],x[2]) for x in db.fetchall()]
+
+    def get_nodes(self, db, resource):
+        #type: (cursor, str) -> List[Dict]
+        self.flush(db)
+        ret_list = []
+        db.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)", (resource,))
+
+        results = db.fetchall()
+        ret = {}
+        for res in results:
+            inx = res[0]
+            if inx is None:
+                inx = res[9]
+            if res[1] is None or res[1] == 'S':
+                ret[inx] = res[2]
+            elif res[1] == 'I':
+                ret[inx] = res[3]
+            elif res[1] == 'L':
+                ret[inx] = res[4]
+            elif res[1] == 'F':
+                ret[inx] = res[5]
+            elif res[1] == 'D':
+                ret[inx] = res[6]
+            elif res[1] == 'T':
+                ret[inx] = res[7]
+            elif res[1] == 't':
+                ret[inx] = res[8]
+            else:
+                raise RuntimeError('Unknown code ' + res[1])
+
+            ret_list += [{'id': res[11], 'label': res[10], 'properties': ret}]            
+
+        return ret_list
+
+
     def flush(self, db):
         # type: (cursor) -> None
         return
 
 
-class CachingLogIndex(DirectWriteLogIndex):
+class EventBindingProvenanceStore(ProvenanceStore):
+
+    event_queue = []
+    binding_queue = []
+    total = 0
+
+    def create_tables(self, cursor):
+        # type: (cursor) -> None
+        node_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _created SERIAL,
+                                                           label VARCHAR(80),
+                                                           PRIMARY KEY(_resource, _key))
+                     """
+
+        event_table = """
+                    CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Event(_key UUID PRIMARY KEY,
+                                                            code CHAR(1),
+                                                            label VARCHAR(80),
+                                                            args VARCHAR)
+        """
+
+        binding_table = """
+                    CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Binding(event UUID NOT NULL,
+                                                            _resource VARCHAR(80) NOT NULL,
+                                                            index INTEGER,
+                                                            code CHAR(1),
+                                                            svalue VARCHAR,
+                                                            ivalue INTEGER,
+                                                            lvalue BIGINT,
+                                                            dvalue DOUBLE PRECISION,
+                                                            fvalue REAL,
+                                                            tvalue DATE,
+                                                            tsvalue TIMESTAMP,
+                                                            uvalue UUID,
+                                                            UNIQUE (uvalue,index))
+        """
+
+        #,                                                            UNIQUE (event,_resource,index,svalue)
+
+        node_props_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           type VARCHAR(80),
+                                                           label VARCHAR(80),
+                                                           value VARCHAR,
+                                                           code CHAR(1),
+                                                           ivalue INTEGER,
+                                                           lvalue BIGINT,
+                                                           dvalue DOUBLE PRECISION,
+                                                           fvalue REAL,
+                                                           tvalue DATE,
+                                                           tsvalue TIMESTAMP,
+                                                           index BIGINT,
+                                                           PRIMARY KEY(_resource, _key, label),
+                                                           UNIQUE(_resource,_key,index)
+                                                           )
+                           """
+
+        edge_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _from VARCHAR(80) NOT NULL,
+                                                           _to VARCHAR(80) NOT NULL,
+                                                           label VARCHAR(80),
+                                                           PRIMARY KEY(_resource, _key),
+                                                           UNIQUE(_resource, _from, _to, label)
+                                                           )
+                     """
+
+        edge_props_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           _created SERIAL,
+                                                           type VARCHAR(80),
+                                                           label VARCHAR(80),
+                                                           value VARCHAR,
+                                                           code CHAR(1),
+                                                           ivalue INTEGER,
+                                                           lvalue BIGINT,
+                                                           dvalue DOUBLE PRECISION,
+                                                           fvalue REAL,
+                                                           tvalue DATE,
+                                                           tsvalue TIMESTAMP,
+                                                           index BIGINT,
+                                                           PRIMARY KEY(_resource, _key, label),
+                                                           UNIQUE(_resource,_key,index)
+                                                           )
+                           """
+
+        schema_table = """
+                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
+                                                           _resource VARCHAR(80) NOT NULL,
+                                                           name VARCHAR(80) NOT NULL,
+                                                           value VARCHAR,
+                                                           PRIMARY KEY(_resource, _key),
+                                                           UNIQUE(_resource, name)
+                                                           )
+                       """
+
+        cursor.execute(node_table)
+        cursor.execute(event_table)
+        cursor.execute(binding_table)
+        cursor.execute(node_props_table)
+        cursor.execute(edge_table)
+        cursor.execute(edge_props_table)
+        cursor.execute(schema_table)
+        psycopg2.extras.register_uuid()
+
+    def clear_tables(self, cursor, graph):
+        # type: (cursor, str) -> None
+        cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (graph,))
+        cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (graph,))
+        cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (graph,))
+        cursor.execute("DELETE FROM MProv_Binding WHERE _resource = (%s)", (graph, ))
+        cursor.execute("DELETE FROM MProv_Event", (graph, ))
+
+
+    def _add_node_binding(self, id, label, resource, args):
+        #self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None))
+        self.binding_queue.append((id,resource,-1,None,args,None,None,None,None,None,None,None))
+
+    def _add_edge_binding(self, id, resource, source, label, dest):
+        uuid = self._get_id_from_key(source + '\\' + label + '\\' + dest)
+        self.binding_queue.append((id,resource,0,None,source,None,None,None,None,None,None,uuid))
+        self.binding_queue.append((id,resource,1,None,dest,None,None,None,None,None,None,uuid))
+        return
+
+    """
+    Pass-through interface for provenance event logs
+    """
+    def add_node(self, db, resource, label, node_identifier):
+        # type: (cursor, str, str, str) -> int
+        """
+        Inserts a node into the database cursor, for the given resource, with a given label.
+        The skolem_args will be the basis of the value
+        """
+
+        # We are going to create a unique node signature including the node
+        #logging.debug('Node: ' + label + '(' + skolem_args + ')')
+
+        logging.info('Adding node %s:%s' %(label,node_identifier))
+        id = self._add_node_event(db, label, node_identifier)
+        self._add_node_binding(id, label, resource, node_identifier)
+        self.flush(db)
+
+        return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
+            (node_identifier,resource,label))
+        #return 1
+
+    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, Any, int) -> int
+        id = self._add_node_property_event(db, label, value)
+        logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
+        if isinstance(value, str):
+            return self.add_nodeprop_str(db, resource, node, label, value, ind)
+        elif isinstance(value, int):
+            return self.add_nodeprop_int(db, resource, node, label, value, ind)
+        elif isinstance(value, float):
+            return self.add_nodeprop_float(db, resource, node, label, value, ind)
+        elif isinstance(value, datetime.datetime):
+            return self.add_nodeprop_date(db, resource, node, label, value, ind)
+        else:
+            raise Exception('Unknown type')
+
+
+    def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, str, int) -> int
+        if ind:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',%s) ON CONFLICT DO NOTHING", \
+                (node, resource, label, value, ind))
+        else:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code) VALUES(%s,%s,%s,%s,'S') ON CONFLICT DO NOTHING", \
+                (node, resource, label, value))
+
+    def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, int, int) -> int
+        if ind:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
+                (node, resource, label, value, ind))
+        else:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
+                (node, resource, label, value))
+
+    def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, float, int) -> int
+        if ind:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
+                (node, resource, label, value, ind))
+        else:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
+                (node, resource, label, value))
+
+    def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, datetime.datetime, int) -> int
+        if ind:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
+                (node, resource, label, value, ind))
+        else:
+            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
+                (node, resource, label, value))
+
+    edge_count = 0
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> int
+        self.edge_count += 1
+        logging.info('Adding edge %s: (%s, %s, %s)' %(self.edge_count, source, label, dest))
+        id = self._add_edge_event(db, label, None)
+        self._add_edge_binding(id, resource, source, label, dest)
+        self.flush(db)
+        return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+            (resource, source, dest, label))
+
+    def get_provenance_data(self, db, resource, token):
+        # type: (cursor, str, str) -> List[Dict]
+        self.flush(db)
+        ret = []
+        db.execute("""SELECT b.index,b.code,b.svalue,b.ivalue,b.lvalue,b.fvalue,b.dvalue,b.tvalue,b.tsvalue,b.uvalue,e.label 
+                      FROM MProv_Binding s 
+                        JOIN MProv_Event e ON s.event = e._key
+                        LEFT JOIN MProv_Binding b ON e._key = b.event
+                      WHERE s._resource = (%s) AND (e.code = 'N' or e.code = 'P') AND s.index = NULL AND 
+                        s.svalue = %s""", 
+            (resource,token))
+
+        results = db.fetchall()
+        ret = {}
+        for res in results:
+            inx = res[0]
+            if inx is None:
+                inx = res[10]
+            if res[1] is None or res[1] == 'S':
+                ret[inx] = res[2]
+            elif res[1] == 'I':
+                ret[inx] = res[3]
+            elif res[1] == 'L':
+                ret[inx] = res[4]
+            elif res[1] == 'F':
+                ret[inx] = res[5]
+            elif res[1] == 'D':
+                ret[inx] = res[6]
+            elif res[1] == 'T':
+                ret[inx] = res[7]
+            elif res[1] == 't':
+                ret[inx] = res[8]
+            elif res[1] == 'u':
+                ret[inx] = res[9]
+            else:
+                raise RuntimeError('Unknown code ' + res[1])
+
+        return [ret]
+
+    def _get_connected(self, db, resource, token, inx, label1):
+        # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
+        self.flush(db)
+        if label1 is None:
+            # Need to start with the DEST, which is index 1
+            db.execute("""SELECT b.index,b.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                            LEFT JOIN MProv_Binding b ON e._key = b.event
+                        WHERE s._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
+                            s.svalue = %s AND b.index <> s.index AND b.uvalue = s.uvalue""", 
+                (resource,inx,token))
+        else:
+        # Need to start with the DEST, which is index 1
+            db.execute("""SELECT b.index,b.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                            LEFT JOIN MProv_Binding b ON e._key = b.event
+                        WHERE s._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
+                            s.svalue = %s AND e.label=%s AND b.index <> s.index""", 
+                (resource,inx,token,label1))
+
+        return [x[1] for x in db.fetchall()]
+
+
+    def get_connected_to(self, db, resource, token, label1):
+        return self._get_connected(db, resource, token, 1, label1)
+
+    def get_connected_from(self, db, resource, token, label1):
+        return self._get_connected(db, resource, token, 0, label1)
+
+    def _write_events(self, db):
+        # type: (cursor) -> None
+        if len(self.event_queue) > 0:
+            execute_values(db,"INSERT INTO MProv_Event(_key,code,label,args) VALUES %s ON CONFLICT DO NOTHING", \
+                self.event_queue)
+
+        self.total += len(self.event_queue)
+        self.event_queue.clear()
+        return 1
+
+    def _write_bindings(self, db):
+        # type: (cursor) -> None
+        if len(self.binding_queue) > 0:
+            execute_values(db,"INSERT INTO MProv_Binding(event,_resource,index,code,svalue,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,uvalue) VALUES %s ON CONFLICT DO NOTHING", \
+                self.binding_queue)
+
+        self.total += len(self.binding_queue)
+        self.binding_queue.clear()
+        return 1
+
+    def get_edges(self, db, resource):
+        #type: (cursor, str) -> List[Tuple]
+        self.flush(db)
+        db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
+
+        return [(x[0],x[1],x[2]) for x in db.fetchall()]
+
+    def get_nodes(self, db, resource):
+        #type: (cursor, str) -> List[Dict]
+        self.flush(db)
+        ret_list = []
+        db.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)", (resource,))
+
+        results = db.fetchall()
+        ret = {}
+        for res in results:
+            inx = res[0]
+            if inx is None:
+                inx = res[10]
+            if res[1] is None or res[1] == 'S':
+                ret[inx] = res[2]
+            elif res[1] == 'I':
+                ret[inx] = res[3]
+            elif res[1] == 'L':
+                ret[inx] = res[4]
+            elif res[1] == 'F':
+                ret[inx] = res[5]
+            elif res[1] == 'D':
+                ret[inx] = res[6]
+            elif res[1] == 'T':
+                ret[inx] = res[7]
+            elif res[1] == 't':
+                ret[inx] = res[8]
+            else:
+                raise RuntimeError('Unknown code ' + res[1])
+
+            ret_list = ret_list + [{'id': res[11], 'label': res[9], 'properties': ret}]
+
+        return ret_list
+
+    def flush(self, db):
+        # type: (cursor) -> None
+        self._write_events(db)
+        self._write_bindings(db)
+        return
+
+    def _get_id(self):
+        # type: () -> UUID
+        return uuid.uuid4()
+
+    def _get_id_from_key(self, key):
+        # type: (str) -> UUID
+        return uuid.uuid5(uuid.NAMESPACE_URL, key)
+
+    def _add_node_event(self, db, label, args, id=None):
+        # type: (cursor, str, str, UUID) -> UUID
+        if id == None:
+            id = self._get_id_from_key(label + '\\N')# + str(args))
+
+        self.event_queue.append((id, 'N', label, None))#args))
+        return id
+
+    def _add_edge_event(self, db, label, args, id=None):
+        # type: (cursor, str, str, UUID) -> UUID
+        if id == None:
+            id = self._get_id_from_key(label + '\\E')# + '\\N' + str(args))
+        self.event_queue.append((id, 'E', label, args))
+        return id
+
+    def _add_node_property_event(self, db, label, args, id=None):
+        # type: (cursor, str, str, UUID) -> UUID
+        if id == None:
+            id = self._get_id_from_key(label + '\\P')# + '\\N' + str(args))
+        self.event_queue.append((id, 'P', label, args))
+        return id
+
+class CachingSQLProvenanceStore(SQLProvenanceStore):
     MAX_ELEMENTS = 16384
     done = set()
     nodeprop_pool = set()
@@ -329,8 +781,6 @@ class CachingLogIndex(DirectWriteLogIndex):
         The skolem_args will be the basis of the value
         """
         logging.debug('Node: ' + label + '(' + skolem_args + ')')
-        # return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
-        #     (skolem_args,resource,label))
         ins_str = (skolem_args,resource,label)
         self.node_pool.add(ins_str)
         if len(self.node_pool) > self.MAX_ELEMENTS:
@@ -339,18 +789,15 @@ class CachingLogIndex(DirectWriteLogIndex):
     def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, str, int) -> int
         ins_str = (node,resource,None,label,value,'S',None,None,None,None,None, None, ind)
-        #if ins_str not in self.done:
+
         self.nodeprop_pool.add(ins_str)
-            #self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops(db)
 
     def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, int, int) -> int
         ins_str = (node,resource,None,label,None,'I',value,None,None,None,None, None, ind)
-        #if ins_str not in self.done:
         self.nodeprop_pool.add(ins_str)
-        #    self.done.add(ins_str)
         if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
             self._write_nodeprops(db)
 
@@ -380,7 +827,119 @@ class CachingLogIndex(DirectWriteLogIndex):
         if len(self.edge_pool) > self.MAX_ELEMENTS:
             self._write_edges(db)
 
-class CompressingLogIndex(LogIndex):
+    def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
+        return super().get_edges(db, resource)
+
+    def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
+        return super().get_nodes(db, resource)
+
+class CachingEventBindingProvenanceStore(EventBindingProvenanceStore):
+    MAX_ELEMENTS = 16384
+    done = set()
+    nodeprop_pool = set()
+    node_pool = set()
+    edge_pool = set()
+
+    total = 0
+
+    def flush(self, db):
+        # type: (cursor) -> None
+        if len(self.node_pool) > 0:
+            print('Flushing nodes...')
+            self._write_nodes(db)
+        if len(self.edge_pool) > 0:
+            print('Flushing edges...')
+            self._write_edges(db)
+        if len(self.nodeprop_pool) > 0:
+            print('Flushing node properties...')
+            self._write_nodeprops(db)
+        print ('Total flushed: %d'%self.total)
+
+    def _write_nodes(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_Node(_key,_resource,label) VALUES %s ON CONFLICT DO NOTHING", \
+            self.node_pool)
+
+        self.total += len(self.node_pool)
+        self.node_pool.clear()
+        return 1
+
+    def _write_edges(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES %s ON CONFLICT DO NOTHING", \
+            self.edge_pool)
+        self.total += len(self.edge_pool)
+        self.edge_pool.clear()
+        return
+
+    def _write_nodeprops(self, db):
+        # type: (cursor) -> None
+        execute_values(db,"INSERT INTO MProv_NodeProp(_key,_resource,type,label,value,code,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,index) VALUES %s ON CONFLICT DO NOTHING", \
+            self.nodeprop_pool)
+        self.total += len(self.nodeprop_pool)
+        self.nodeprop_pool.clear()
+        return
+
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, str) -> int
+        """
+        Inserts a node into the database cursor, for the given resource, with a given label.
+        The skolem_args will be the basis of the value
+        """
+        logging.debug('Node: ' + label + '(' + skolem_args + ')')
+        ins_str = (skolem_args,resource,label)
+        self.node_pool.add(ins_str)
+        if len(self.node_pool) > self.MAX_ELEMENTS:
+            self._write_nodes(db)
+
+    def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, str, int) -> int
+        ins_str = (node,resource,None,label,value,'S',None,None,None,None,None, None, ind)
+
+        self.nodeprop_pool.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops(db)
+
+    def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, int, int) -> int
+        ins_str = (node,resource,None,label,None,'I',value,None,None,None,None, None, ind)
+        self.nodeprop_pool.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops(db)
+
+    def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, float, int) -> int
+        ins_str = (node,resource,None,label,None,'F',None,None,None,value,None, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.add(ins_str)
+        #    self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops(db)
+
+    def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, datetime.datetime, int) -> int
+        ins_str = (node,resource,None,label,None,'T',None,None,None,None,value, None, ind)
+        #if ins_str not in self.done:
+        self.nodeprop_pool.add(ins_str)
+        #    self.done.add(ins_str)
+        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
+            self._write_nodeprops(db)
+
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> int
+        logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
+        ins_str = (resource, source, dest, label)
+        self.edge_pool.add(ins_str)
+        if len(self.edge_pool) > self.MAX_ELEMENTS:
+            self._write_edges(db)
+
+    def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
+        return super().get_edges(db, resource)
+
+    def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
+        return super().get_nodes(db, resource)
+
+class CompressingProvenanceStore(ProvenanceStore):
     # Basic format:
     # index -> (op_type, (tokens))
     #   op_type is one of: n(add_node), e(add_edge), p(add_prop), r(repeat), 2(seq_2), f(for), s(span)
@@ -409,7 +968,7 @@ class CompressingLogIndex(LogIndex):
     last_node = None
 
     def __init__(self, r_index):
-        # type: (LogIndex) -> None
+        # type: (ProvenanceStore) -> None
         self.real_index = r_index
 
     def create_tables(self, db):
@@ -495,3 +1054,9 @@ class CompressingLogIndex(LogIndex):
     def get_connected_from(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
         return self.real_index.get_connected_to(db, resource, token, label1)
+
+    def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
+        return self.real_index.get_nodes(db, resource)
+
+    def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
+        return self.real_index.get_edges(db, resource)
