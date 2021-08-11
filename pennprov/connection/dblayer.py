@@ -38,6 +38,7 @@ class ProvenanceStore:
         Retrieve the appropriate provenance indexing subsystem
         """
         return EventBindingProvenanceStore()
+        #return CachingSQLProvenanceStore()
         #return CompressingLogIndex(CachingLogIndex())
 
     def add_node(self, db, resource, label, skolem_args):
@@ -312,32 +313,50 @@ class SQLProvenanceStore(ProvenanceStore):
         #type: (cursor, str) -> List[Dict]
         self.flush(db)
         ret_list = []
-        db.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)", (resource,))
 
+        # Get the nodes first
+        db.execute("""SELECT n.label,n._key 
+            FROM MProv_Node n WHERE n._resource=%s""", 
+            (resource,))
         results = db.fetchall()
-        ret = {}
         for res in results:
-            inx = res[0]
-            if inx is None:
-                inx = res[10]
-            if res[1] is None or res[1] == 'S':
-                ret[inx] = res[2]
-            elif res[1] == 'I':
-                ret[inx] = res[3]
-            elif res[1] == 'L':
-                ret[inx] = res[4]
-            elif res[1] == 'F':
-                ret[inx] = res[5]
-            elif res[1] == 'D':
-                ret[inx] = res[6]
-            elif res[1] == 'T':
-                ret[inx] = res[7]
-            elif res[1] == 't':
-                ret[inx] = res[8]
-            else:
-                raise RuntimeError('Unknown code ' + res[1])
+            ret = {}
+            ret['id'] = res[1]
+            ret['label'] = res[0]
+            ret_list = ret_list + [ret]
 
-            ret_list += [{'id': res[11], 'label': res[9], 'properties': ret}]            
+        for ret in ret_list:
+            db.execute("""SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,label
+                FROM MProv_NodeProp WHERE _key = %s AND _resource = (%s)""", 
+                (ret['id'], resource,))
+
+            # db.execute("""SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key 
+            #     FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)""", 
+            #     (resource,))
+
+            results = db.fetchall()
+            for res in results:
+                inx = res[0]
+                if inx is None:
+                    inx = res[9]
+                if res[1] is None or res[1] == 'S':
+                    ret[inx] = res[2]
+                elif res[1] == 'I':
+                    ret[inx] = res[3]
+                elif res[1] == 'L':
+                    ret[inx] = res[4]
+                elif res[1] == 'F':
+                    ret[inx] = res[5]
+                elif res[1] == 'D':
+                    ret[inx] = res[6]
+                elif res[1] == 'T':
+                    ret[inx] = res[7]
+                elif res[1] == 't':
+                    ret[inx] = res[8]
+                else:
+                    raise RuntimeError('Unknown code ' + res[1])
+
+                logging.info("Node: " + str(ret))
 
         return ret_list
 
@@ -355,13 +374,13 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def create_tables(self, cursor):
         # type: (cursor) -> None
-        node_table = """
-                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
-                                                           _resource VARCHAR(80) NOT NULL,
-                                                           _created SERIAL,
-                                                           label VARCHAR(80),
-                                                           PRIMARY KEY(_resource, _key))
-                     """
+        # node_table = """
+        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
+        #                                                    _resource VARCHAR(80) NOT NULL,
+        #                                                    _created SERIAL,
+        #                                                    label VARCHAR(80),
+        #                                                    PRIMARY KEY(_resource, _key))
+        #              """
 
         event_table = """
                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Event(_key UUID PRIMARY KEY,
@@ -388,55 +407,55 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         #,                                                            UNIQUE (event,_resource,index,svalue)
 
-        node_props_table = """
-                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
-                                                           _resource VARCHAR(80) NOT NULL,
-                                                           type VARCHAR(80),
-                                                           label VARCHAR(80),
-                                                           value VARCHAR,
-                                                           code CHAR(1),
-                                                           ivalue INTEGER,
-                                                           lvalue BIGINT,
-                                                           dvalue DOUBLE PRECISION,
-                                                           fvalue REAL,
-                                                           tvalue DATE,
-                                                           tsvalue TIMESTAMP,
-                                                           index BIGINT,
-                                                           PRIMARY KEY(_resource, _key, label),
-                                                           UNIQUE(_resource,_key,index)
-                                                           )
-                           """
+        # node_props_table = """
+        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
+        #                                                    _resource VARCHAR(80) NOT NULL,
+        #                                                    type VARCHAR(80),
+        #                                                    label VARCHAR(80),
+        #                                                    value VARCHAR,
+        #                                                    code CHAR(1),
+        #                                                    ivalue INTEGER,
+        #                                                    lvalue BIGINT,
+        #                                                    dvalue DOUBLE PRECISION,
+        #                                                    fvalue REAL,
+        #                                                    tvalue DATE,
+        #                                                    tsvalue TIMESTAMP,
+        #                                                    index BIGINT,
+        #                                                    PRIMARY KEY(_resource, _key, label),
+        #                                                    UNIQUE(_resource,_key,index)
+        #                                                    )
+        #                    """
 
-        edge_table = """
-                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
-                                                           _resource VARCHAR(80) NOT NULL,
-                                                           _from VARCHAR(80) NOT NULL,
-                                                           _to VARCHAR(80) NOT NULL,
-                                                           label VARCHAR(80),
-                                                           PRIMARY KEY(_resource, _key),
-                                                           UNIQUE(_resource, _from, _to, label)
-                                                           )
-                     """
+        # edge_table = """
+        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
+        #                                                    _resource VARCHAR(80) NOT NULL,
+        #                                                    _from VARCHAR(80) NOT NULL,
+        #                                                    _to VARCHAR(80) NOT NULL,
+        #                                                    label VARCHAR(80),
+        #                                                    PRIMARY KEY(_resource, _key),
+        #                                                    UNIQUE(_resource, _from, _to, label)
+        #                                                    )
+        #              """
 
-        edge_props_table = """
-                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
-                                                           _resource VARCHAR(80) NOT NULL,
-                                                           _created SERIAL,
-                                                           type VARCHAR(80),
-                                                           label VARCHAR(80),
-                                                           value VARCHAR,
-                                                           code CHAR(1),
-                                                           ivalue INTEGER,
-                                                           lvalue BIGINT,
-                                                           dvalue DOUBLE PRECISION,
-                                                           fvalue REAL,
-                                                           tvalue DATE,
-                                                           tsvalue TIMESTAMP,
-                                                           index BIGINT,
-                                                           PRIMARY KEY(_resource, _key, label),
-                                                           UNIQUE(_resource,_key,index)
-                                                           )
-                           """
+        # edge_props_table = """
+        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
+        #                                                    _resource VARCHAR(80) NOT NULL,
+        #                                                    _created SERIAL,
+        #                                                    type VARCHAR(80),
+        #                                                    label VARCHAR(80),
+        #                                                    value VARCHAR,
+        #                                                    code CHAR(1),
+        #                                                    ivalue INTEGER,
+        #                                                    lvalue BIGINT,
+        #                                                    dvalue DOUBLE PRECISION,
+        #                                                    fvalue REAL,
+        #                                                    tvalue DATE,
+        #                                                    tsvalue TIMESTAMP,
+        #                                                    index BIGINT,
+        #                                                    PRIMARY KEY(_resource, _key, label),
+        #                                                    UNIQUE(_resource,_key,index)
+        #                                                    )
+        #                    """
 
         schema_table = """
                      CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
@@ -448,32 +467,53 @@ class EventBindingProvenanceStore(ProvenanceStore):
                                                            )
                        """
 
-        cursor.execute(node_table)
+        # cursor.execute(node_table)
         cursor.execute(event_table)
         cursor.execute(binding_table)
-        cursor.execute(node_props_table)
-        cursor.execute(edge_table)
-        cursor.execute(edge_props_table)
+        # cursor.execute(node_props_table)
+        # cursor.execute(edge_table)
+        # cursor.execute(edge_props_table)
         cursor.execute(schema_table)
         psycopg2.extras.register_uuid()
 
     def clear_tables(self, cursor, graph):
         # type: (cursor, str) -> None
-        cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (graph,))
-        cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (graph,))
-        cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (graph,))
+        # cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (graph,))
+        # cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (graph,))
+        # cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (graph,))
         cursor.execute("DELETE FROM MProv_Binding WHERE _resource = (%s)", (graph, ))
         cursor.execute("DELETE FROM MProv_Event", (graph, ))
 
 
     def _add_node_binding(self, id, label, resource, args):
         #self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None))
-        self.binding_queue.append((id,resource,-1,None,args,None,None,None,None,None,None,None))
+        self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None,None))
 
     def _add_edge_binding(self, id, resource, source, label, dest):
         uuid = self._get_id_from_key(source + '\\' + label + '\\' + dest)
         self.binding_queue.append((id,resource,0,None,source,None,None,None,None,None,None,uuid))
         self.binding_queue.append((id,resource,1,None,dest,None,None,None,None,None,None,uuid))
+        return
+
+
+    def _add_node_property_str_binding(self, resource, id, node, label,  value, ind):
+        uuid = self._get_id_from_key(node + '\\' + label)
+        self.binding_queue.append((id,resource,ind,None,value,None,None,None,None,None,None,uuid))
+        return
+
+    def _add_node_property_int_binding(self, resource, id, node, label,  value, ind):
+        uuid = self._get_id_from_key(node + '\\' + label)
+        self.binding_queue.append((id,resource,ind,None,None,value,None,None,None,None,None,uuid))
+        return
+
+    def _add_node_property_float_binding(self, resource, id, node, label,  value, ind):
+        uuid = self._get_id_from_key(node + '\\' + label)
+        self.binding_queue.append((id,resource,ind,None,None,None,None,value,None,None,None,uuid))
+        return
+
+    def _add_node_property_datetime_binding(self, resource, id, node, label,  value, ind):
+        uuid = self._get_id_from_key(node + '\\' + label)
+        self.binding_queue.append((id,resource,ind,None,None,None,None,None,None,None,value,uuid))
         return
 
     """
@@ -494,61 +534,65 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self._add_node_binding(id, label, resource, node_identifier)
         self.flush(db)
 
-        return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
-            (node_identifier,resource,label))
-        #return 1
+        #return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
+        #    (node_identifier,resource,label))
+        return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
         id = self._add_node_property_event(db, label, value)
         logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
-            return self.add_nodeprop_str(db, resource, node, label, value, ind)
+            return self._add_node_property_str_binding(resource, id, node, label,  value, ind)
+            #return self.add_nodeprop_str(db, resource, node, label, value, ind)
         elif isinstance(value, int):
-            return self.add_nodeprop_int(db, resource, node, label, value, ind)
+            return self._add_node_property_int_binding(resource, id, node, label,  value, ind)
+            #return self.add_nodeprop_int(db, resource, node, label, value, ind)
         elif isinstance(value, float):
-            return self.add_nodeprop_float(db, resource, node, label, value, ind)
+            return self._add_node_property_float_binding(resource, id, node, label,  value, ind)
+            #return self.add_nodeprop_float(db, resource, node, label, value, ind)
         elif isinstance(value, datetime.datetime):
-            return self.add_nodeprop_date(db, resource, node, label, value, ind)
+            return self._add_node_property_datetime_binding(resource, id, node, label,  value, ind)
+            #return self.add_nodeprop_date(db, resource, node, label, value, ind)
         else:
             raise Exception('Unknown type')
 
 
-    def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, str, int) -> int
-        if ind:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',%s) ON CONFLICT DO NOTHING", \
-                (node, resource, label, value, ind))
-        else:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code) VALUES(%s,%s,%s,%s,'S') ON CONFLICT DO NOTHING", \
-                (node, resource, label, value))
+    # def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
+    #     # type: (cursor, str, str, str, str, int) -> int
+    #     if ind:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',%s) ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value, ind))
+    #     else:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code) VALUES(%s,%s,%s,%s,'S') ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value))
 
-    def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, int, int) -> int
-        if ind:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
-                (node, resource, label, value, ind))
-        else:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
-                (node, resource, label, value))
+    # def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
+    #     # type: (cursor, str, str, str, int, int) -> int
+    #     if ind:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value, ind))
+    #     else:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value))
 
-    def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, float, int) -> int
-        if ind:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
-                (node, resource, label, value, ind))
-        else:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
-                (node, resource, label, value))
+    # def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
+    #     # type: (cursor, str, str, str, float, int) -> int
+    #     if ind:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value, ind))
+    #     else:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value))
 
-    def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, datetime.datetime, int) -> int
-        if ind:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
-                (node, resource, label, value, ind))
-        else:
-            return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
-                (node, resource, label, value))
+    # def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
+    #     # type: (cursor, str, str, str, datetime.datetime, int) -> int
+    #     if ind:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value, ind))
+    #     else:
+    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
+    #             (node, resource, label, value))
 
     edge_count = 0
     def add_edge(self, db, resource, source, label, dest):
@@ -558,8 +602,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         id = self._add_edge_event(db, label, None)
         self._add_edge_binding(id, resource, source, label, dest)
         self.flush(db)
-        return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-            (resource, source, dest, label))
+        #return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
+        #    (resource, source, dest, label))
+        return 1
 
     def get_provenance_data(self, db, resource, token):
         # type: (cursor, str, str) -> List[Dict]
@@ -668,32 +713,52 @@ class EventBindingProvenanceStore(ProvenanceStore):
         #type: (cursor, str) -> List[Dict]
         self.flush(db)
         ret_list = []
-        db.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)", (resource,))
+        db.execute("""SELECT e.label,s.svalue,s.event
+                      FROM MProv_Binding s 
+                        JOIN MProv_Event e ON s.event = e._key
+                      WHERE s._resource = (%s) AND e.code = 'N'""", 
+            (resource,))
+        # db.execute("""SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key 
+        #     FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)""", 
+        #     (resource,))
+        ret = {}
 
         results = db.fetchall()
-        ret = {}
         for res in results:
-            inx = res[0]
-            if inx is None:
-                inx = res[10]
-            if res[1] is None or res[1] == 'S':
-                ret[inx] = res[2]
-            elif res[1] == 'I':
-                ret[inx] = res[3]
-            elif res[1] == 'L':
-                ret[inx] = res[4]
-            elif res[1] == 'F':
-                ret[inx] = res[5]
-            elif res[1] == 'D':
-                ret[inx] = res[6]
-            elif res[1] == 'T':
-                ret[inx] = res[7]
-            elif res[1] == 't':
-                ret[inx] = res[8]
-            else:
-                raise RuntimeError('Unknown code ' + res[1])
+            ret = {}
+            ret['id'] = res[1]
+            ret['_event'] = res[2]
+            ret['label'] = res[0]
+            ret_list = ret_list + [ret]
 
-            ret_list = ret_list + [{'id': res[11], 'label': res[9], 'properties': ret}]
+        for ret in ret_list:
+            db.execute("""SELECT s.index,s.svalue,s.ivalue,s.lvalue,s.dvalue,s.fvalue,s.tvalue,s.tsvalue,e.label
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                            LEFT JOIN MProv_Binding b ON e._key = b.event
+                        WHERE s._resource = (%s) AND e.code = 'P' AND s.uvalue=%s""", 
+                (resource,ret['_event']))
+            results = db.fetchall()
+            for res in results:
+                inx = res[0]
+                if inx is None:
+                    inx = res[9]
+                if res[1] is None or res[1] == 'S':
+                    ret[inx] = res[2]
+                elif res[1] == 'I':
+                    ret[inx] = res[3]
+                elif res[1] == 'L':
+                    ret[inx] = res[4]
+                elif res[1] == 'F':
+                    ret[inx] = res[5]
+                elif res[1] == 'D':
+                    ret[inx] = res[6]
+                elif res[1] == 'T':
+                    ret[inx] = res[7]
+                elif res[1] == 't':
+                    ret[inx] = res[8]
+                else:
+                    raise RuntimeError('Unknown code ' + res[1])
 
         return ret_list
 
@@ -730,7 +795,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(label + '\\P')# + '\\N' + str(args))
-        self.event_queue.append((id, 'P', label, args))
+        self.event_queue.append((id, 'P', label, None))#args))
         return id
 
 class CachingSQLProvenanceStore(SQLProvenanceStore):

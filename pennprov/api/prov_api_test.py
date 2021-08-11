@@ -17,21 +17,24 @@ if mprov_conn:
 else:
     raise RuntimeError('Could not connect')
 
+#sub_stream_1 = None
+#sub_stream_2 = None
+mprov_conn.create_or_reset_graph()
+main_stream = mprov_conn.create_collection('output_ecg')
 sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
 sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
-
-@MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
-@pytest.mark.skip(reason="Not a test fn")
-def test(n):
-    return n.groupby('x').count()
-
-@MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
-@pytest.mark.skip(reason="Not a test fn")
-def testx(n):
-    return n.groupby('x').count()
+mprov_conn.add_to_collection(sub_stream_1, main_stream)
+mprov_conn.add_to_collection(sub_stream_2, main_stream)
 
 def test_main():
-    mprov_conn.create_or_reset_graph()
+    global mprov_conn
+
+    main_stream = mprov_conn.create_collection('output_ecg')
+    sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
+    sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
+    mprov_conn.add_to_collection(sub_stream_1, main_stream)
+    mprov_conn.add_to_collection(sub_stream_2, main_stream)
+
     # Test the decorators, which will create entities for the dataframe
     # elements, and nodes representing the dataframe components
     ecg = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
@@ -43,7 +46,7 @@ def test_main():
 
     mprov_conn.flush()
 
-    logging.info(mprov_conn.get_dot())
+    mprov_conn.get_dot("test_main.dot")
 
     df = ecg
 
@@ -116,5 +119,16 @@ def x_test_at_scale():
             inx = inx + 1
 
     mprov_conn.flush()
+    #mprov_conn.get_dot("test_at_scale.dot")
     print('Finished after %s' %(datetime.now()-start))
+
+@MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
+@pytest.mark.skip(reason="Not a test fn")
+def test(n):
+    return n.groupby('x').count()
+
+@MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
+@pytest.mark.skip(reason="Not a test fn")
+def testx(n):
+    return n.groupby('x').count()
 
