@@ -37,7 +37,7 @@ class ProvenanceStore:
         """
         Retrieve the appropriate provenance indexing subsystem
         """
-        return SQLProvenanceStore()
+        return EventBindingProvenanceStore()
         #return CompressingLogIndex(CachingLogIndex())
 
     def add_node(self, db, resource, label, skolem_args):
@@ -319,7 +319,7 @@ class SQLProvenanceStore(ProvenanceStore):
         for res in results:
             inx = res[0]
             if inx is None:
-                inx = res[9]
+                inx = res[10]
             if res[1] is None or res[1] == 'S':
                 ret[inx] = res[2]
             elif res[1] == 'I':
@@ -337,7 +337,7 @@ class SQLProvenanceStore(ProvenanceStore):
             else:
                 raise RuntimeError('Unknown code ' + res[1])
 
-            ret_list += [{'id': res[11], 'label': res[10], 'properties': ret}]            
+            ret_list += [{'id': res[11], 'label': res[9], 'properties': ret}]            
 
         return ret_list
 
@@ -619,7 +619,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                             JOIN MProv_Event e ON s.event = e._key
                             LEFT JOIN MProv_Binding b ON e._key = b.event
                         WHERE s._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
-                            s.svalue = %s AND e.label=%s AND b.index <> s.index""", 
+                            s.svalue = %s AND e.label=%s AND b.index <> s.index AND s.uvalue = b.uvalue""", 
                 (resource,inx,token,label1))
 
         return [x[1] for x in db.fetchall()]
@@ -654,7 +654,13 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def get_edges(self, db, resource):
         #type: (cursor, str) -> List[Tuple]
         self.flush(db)
-        db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
+        #db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
+        db.execute("""SELECT s.svalue,e.label,b.svalue
+                    FROM MProv_Binding s 
+                        JOIN MProv_Event e ON s.event = e._key
+                        LEFT JOIN MProv_Binding b ON e._key = b.event
+                    WHERE s._resource = (%s) AND e.code = 'E' AND s.index = 0 AND b.index =1 AND b.uvalue = s.uvalue""", 
+            (resource,))
 
         return [(x[0],x[1],x[2]) for x in db.fetchall()]
 

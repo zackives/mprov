@@ -53,12 +53,12 @@ def test_main():
 
     # What are the sources for a given output ECG (these should be windows)
     source_list = mprov_conn.get_source_entities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
-    assert(len(source_list) == 1)
     logging.info ("Sources: %s" %(str(source_list)))
+    assert(len(source_list) == 1)
     # Are there any derived?
     derived_list = mprov_conn.get_derived_entities(mprov_conn.get_token_qname(mprov_conn.get_entity_id('output_ecg', 'w[[1, 1], [3, 1]]')))
-    assert(len(derived_list) == 0)
     logging.info ("Should be no derived: %s" %str(derived_list))
+    assert(len(derived_list) == 0)
 
     # Take a source (window) and see if we can read it
     source_node = mprov_conn.get_node(source_list[0])
