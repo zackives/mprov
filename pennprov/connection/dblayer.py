@@ -384,6 +384,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         event_table = """
                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Event(_key UUID PRIMARY KEY,
+                                                            _resource VARCHAR(80) NOT NULL,
                                                             code CHAR(1),
                                                             label VARCHAR(80),
                                                             args VARCHAR)
@@ -391,7 +392,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         binding_table = """
                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Binding(event UUID NOT NULL,
-                                                            _resource VARCHAR(80) NOT NULL,
                                                             index INTEGER,
                                                             code CHAR(1),
                                                             svalue VARCHAR,
@@ -402,6 +402,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                                                             tvalue DATE,
                                                             tsvalue TIMESTAMP,
                                                             uvalue UUID,
+                                                            svalue2 VARCHAR,
                                                             UNIQUE (uvalue,index))
         """
 
@@ -481,39 +482,40 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (graph,))
         # cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (graph,))
         # cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (graph,))
-        cursor.execute("DELETE FROM MProv_Binding WHERE _resource = (%s)", (graph, ))
-        cursor.execute("DELETE FROM MProv_Event", (graph, ))
+        cursor.execute("DELETE FROM MProv_Binding", (graph, ))
+        cursor.execute("DELETE FROM MProv_Event WHERE _resource = (%s)", (graph, ))
 
 
     def _add_node_binding(self, id, label, resource, args):
         #self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None))
-        self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None,None))
+        self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
 
     def _add_edge_binding(self, id, resource, source, label, dest):
         uuid = self._get_id_from_key(source + '\\' + label + '\\' + dest)
-        self.binding_queue.append((id,resource,0,None,source,None,None,None,None,None,None,uuid))
-        self.binding_queue.append((id,resource,1,None,dest,None,None,None,None,None,None,uuid))
+        self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,uuid,dest))
+        #self.binding_queue.append((id,0,None,source,None,None,None,None,None,None,uuid))
+        #self.binding_queue.append((id,1,None,dest,None,None,None,None,None,None,uuid))
         return
 
 
     def _add_node_property_str_binding(self, resource, id, node, label,  value, ind):
         uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,resource,ind,None,value,None,None,None,None,None,None,uuid))
+        self.binding_queue.append((id,ind,None,value,None,None,None,None,None,None,uuid,None))
         return
 
     def _add_node_property_int_binding(self, resource, id, node, label,  value, ind):
         uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,resource,ind,None,None,value,None,None,None,None,None,uuid))
+        self.binding_queue.append((id,ind,None,None,value,None,None,None,None,None,uuid,None))
         return
 
     def _add_node_property_float_binding(self, resource, id, node, label,  value, ind):
         uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,resource,ind,None,None,None,None,value,None,None,None,uuid))
+        self.binding_queue.append((id,ind,None,None,None,None,value,None,None,None,uuid,None))
         return
 
     def _add_node_property_datetime_binding(self, resource, id, node, label,  value, ind):
         uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,resource,ind,None,None,None,None,None,None,None,value,uuid))
+        self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
         return
 
     """
@@ -530,7 +532,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         #logging.debug('Node: ' + label + '(' + skolem_args + ')')
 
         logging.info('Adding node %s:%s' %(label,node_identifier))
-        id = self._add_node_event(db, label, node_identifier)
+        id = self._add_node_event(db, resource, label, node_identifier)
         self._add_node_binding(id, label, resource, node_identifier)
         self.flush(db)
 
@@ -540,7 +542,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
-        id = self._add_node_property_event(db, label, value)
+        id = self._add_node_property_event(db, resource, label, value)
         logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
             return self._add_node_property_str_binding(resource, id, node, label,  value, ind)
@@ -599,7 +601,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, str, str) -> int
         self.edge_count += 1
         logging.info('Adding edge %s: (%s, %s, %s)' %(self.edge_count, source, label, dest))
-        id = self._add_edge_event(db, label, None)
+        id = self._add_edge_event(db, resource, label, None)
         self._add_edge_binding(id, resource, source, label, dest)
         self.flush(db)
         #return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
@@ -614,7 +616,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                       FROM MProv_Binding s 
                         JOIN MProv_Event e ON s.event = e._key
                         LEFT JOIN MProv_Binding b ON e._key = b.event
-                      WHERE s._resource = (%s) AND (e.code = 'N' or e.code = 'P') AND s.index = NULL AND 
+                      WHERE e._resource = (%s) AND (e.code = 'N' or e.code = 'P') AND s.index = NULL AND 
                         s.svalue = %s""", 
             (resource,token))
 
@@ -654,7 +656,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                         FROM MProv_Binding s 
                             JOIN MProv_Event e ON s.event = e._key
                             LEFT JOIN MProv_Binding b ON e._key = b.event
-                        WHERE s._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
+                        WHERE e._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
                             s.svalue = %s AND b.index <> s.index AND b.uvalue = s.uvalue""", 
                 (resource,inx,token))
         else:
@@ -663,7 +665,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                         FROM MProv_Binding s 
                             JOIN MProv_Event e ON s.event = e._key
                             LEFT JOIN MProv_Binding b ON e._key = b.event
-                        WHERE s._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
+                        WHERE e._resource = (%s) AND e.code = 'E' AND s.index = %s AND 
                             s.svalue = %s AND e.label=%s AND b.index <> s.index AND s.uvalue = b.uvalue""", 
                 (resource,inx,token,label1))
 
@@ -671,15 +673,52 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
 
     def get_connected_to(self, db, resource, token, label1):
-        return self._get_connected(db, resource, token, 1, label1)
+        # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
+        self.flush(db)
+        if label1 is None:
+            # Need to start with the DEST
+            db.execute("""SELECT s.index,s.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND s.svalue2 = %s""", 
+                (resource,token))
+        else:
+        # Need to start with the DEST
+            db.execute("""SELECT s.index,s.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue2 = %s AND e.label=%s""", 
+                (resource,token,label1))
+
+        return [x[1] for x in db.fetchall()]
 
     def get_connected_from(self, db, resource, token, label1):
-        return self._get_connected(db, resource, token, 0, label1)
+        # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
+        self.flush(db)
+        if label1 is None:
+            # Need to start with the SOURCE
+            db.execute("""SELECT s.index,s.svalue2,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue = %s""", 
+                (resource,token))
+        else:
+        # Need to start with the SOURCE
+            db.execute("""SELECT s.index,s.svalue2,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue = %s AND e.label=%s""", 
+                (resource,token,label1))
+
+        return [x[1] for x in db.fetchall()]
 
     def _write_events(self, db):
         # type: (cursor) -> None
         if len(self.event_queue) > 0:
-            execute_values(db,"INSERT INTO MProv_Event(_key,code,label,args) VALUES %s ON CONFLICT DO NOTHING", \
+            execute_values(db,"INSERT INTO MProv_Event(_key,_resource,code,label,args) VALUES %s ON CONFLICT DO NOTHING", \
                 self.event_queue)
 
         self.total += len(self.event_queue)
@@ -689,7 +728,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def _write_bindings(self, db):
         # type: (cursor) -> None
         if len(self.binding_queue) > 0:
-            execute_values(db,"INSERT INTO MProv_Binding(event,_resource,index,code,svalue,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,uvalue) VALUES %s ON CONFLICT DO NOTHING", \
+            execute_values(db,"INSERT INTO MProv_Binding(event,index,code,svalue,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,uvalue,svalue2) VALUES %s ON CONFLICT DO NOTHING", \
                 self.binding_queue)
 
         self.total += len(self.binding_queue)
@@ -700,11 +739,10 @@ class EventBindingProvenanceStore(ProvenanceStore):
         #type: (cursor, str) -> List[Tuple]
         self.flush(db)
         #db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
-        db.execute("""SELECT s.svalue,e.label,b.svalue
+        db.execute("""SELECT s.svalue,e.label,s.svalue2
                     FROM MProv_Binding s 
                         JOIN MProv_Event e ON s.event = e._key
-                        LEFT JOIN MProv_Binding b ON e._key = b.event
-                    WHERE s._resource = (%s) AND e.code = 'E' AND s.index = 0 AND b.index =1 AND b.uvalue = s.uvalue""", 
+                    WHERE e._resource = (%s) AND e.code = 'E'""", 
             (resource,))
 
         return [(x[0],x[1],x[2]) for x in db.fetchall()]
@@ -716,7 +754,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         db.execute("""SELECT e.label,s.svalue,s.event
                       FROM MProv_Binding s 
                         JOIN MProv_Event e ON s.event = e._key
-                      WHERE s._resource = (%s) AND e.code = 'N'""", 
+                      WHERE e._resource = (%s) AND e.code = 'N'""", 
             (resource,))
         # db.execute("""SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key 
         #     FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)""", 
@@ -736,7 +774,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
                         FROM MProv_Binding s 
                             JOIN MProv_Event e ON s.event = e._key
                             LEFT JOIN MProv_Binding b ON e._key = b.event
-                        WHERE s._resource = (%s) AND e.code = 'P' AND s.uvalue=%s""", 
+                        WHERE e._resource = (%s) AND e.code = 'P' AND s.uvalue=%s""", 
                 (resource,ret['_event']))
             results = db.fetchall()
             for res in results:
@@ -776,26 +814,26 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (str) -> UUID
         return uuid.uuid5(uuid.NAMESPACE_URL, key)
 
-    def _add_node_event(self, db, label, args, id=None):
-        # type: (cursor, str, str, UUID) -> UUID
+    def _add_node_event(self, db, resource, label, args, id=None):
+        # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
-            id = self._get_id_from_key(label + '\\N')# + str(args))
+            id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
 
-        self.event_queue.append((id, 'N', label, None))#args))
+        self.event_queue.append((id, resource, 'N', label, None))#args))
         return id
 
-    def _add_edge_event(self, db, label, args, id=None):
-        # type: (cursor, str, str, UUID) -> UUID
+    def _add_edge_event(self, db, resource, label, args, id=None):
+        # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
-            id = self._get_id_from_key(label + '\\E')# + '\\N' + str(args))
-        self.event_queue.append((id, 'E', label, args))
+            id = self._get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
+        self.event_queue.append((id, resource, 'E', label, args))
         return id
 
-    def _add_node_property_event(self, db, label, args, id=None):
-        # type: (cursor, str, str, UUID) -> UUID
+    def _add_node_property_event(self, db, resource, label, args, id=None):
+        # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
-            id = self._get_id_from_key(label + '\\P')# + '\\N' + str(args))
-        self.event_queue.append((id, 'P', label, None))#args))
+            id = self._get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
+        self.event_queue.append((id, resource, 'P', label, None))#args))
         return id
 
 class CachingSQLProvenanceStore(SQLProvenanceStore):
