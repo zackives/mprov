@@ -534,7 +534,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         logging.info('Adding node %s:%s' %(label,node_identifier))
         id = self._add_node_event(db, resource, label, node_identifier)
         self._add_node_binding(id, label, resource, node_identifier)
-        self.flush(db)
 
         #return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
         #    (node_identifier,resource,label))
@@ -603,7 +602,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         logging.info('Adding edge %s: (%s, %s, %s)' %(self.edge_count, source, label, dest))
         id = self._add_edge_event(db, resource, label, None)
         self._add_edge_binding(id, resource, source, label, dest)
-        self.flush(db)
         #return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
         #    (resource, source, dest, label))
         return 1
@@ -837,112 +835,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return id
 
 class CachingSQLProvenanceStore(SQLProvenanceStore):
-    MAX_ELEMENTS = 16384
-    done = set()
-    nodeprop_pool = set()
-    node_pool = set()
-    edge_pool = set()
-
-    total = 0
-
-    def flush(self, db):
-        # type: (cursor) -> None
-        if len(self.node_pool) > 0:
-            print('Flushing nodes...')
-            self._write_nodes(db)
-        if len(self.edge_pool) > 0:
-            print('Flushing edges...')
-            self._write_edges(db)
-        if len(self.nodeprop_pool) > 0:
-            print('Flushing node properties...')
-            self._write_nodeprops(db)
-        print ('Total flushed: %d'%self.total)
-
-    def _write_nodes(self, db):
-        # type: (cursor) -> None
-        execute_values(db,"INSERT INTO MProv_Node(_key,_resource,label) VALUES %s ON CONFLICT DO NOTHING", \
-            self.node_pool)
-
-        self.total += len(self.node_pool)
-        self.node_pool.clear()
-        return 1
-
-    def _write_edges(self, db):
-        # type: (cursor) -> None
-        execute_values(db,"INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES %s ON CONFLICT DO NOTHING", \
-            self.edge_pool)
-        self.total += len(self.edge_pool)
-        self.edge_pool.clear()
-        return
-
-    def _write_nodeprops(self, db):
-        # type: (cursor) -> None
-        execute_values(db,"INSERT INTO MProv_NodeProp(_key,_resource,type,label,value,code,ivalue,lvalue,dvalue,fvalue,tvalue,tsvalue,index) VALUES %s ON CONFLICT DO NOTHING", \
-            self.nodeprop_pool)
-        self.total += len(self.nodeprop_pool)
-        self.nodeprop_pool.clear()
-        return
-
-    def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> int
-        """
-        Inserts a node into the database cursor, for the given resource, with a given label.
-        The skolem_args will be the basis of the value
-        """
-        logging.debug('Node: ' + label + '(' + skolem_args + ')')
-        ins_str = (skolem_args,resource,label)
-        self.node_pool.add(ins_str)
-        if len(self.node_pool) > self.MAX_ELEMENTS:
-            self._write_nodes(db)
-
-    def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, str, int) -> int
-        ins_str = (node,resource,None,label,value,'S',None,None,None,None,None, None, ind)
-
-        self.nodeprop_pool.add(ins_str)
-        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
-            self._write_nodeprops(db)
-
-    def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, int, int) -> int
-        ins_str = (node,resource,None,label,None,'I',value,None,None,None,None, None, ind)
-        self.nodeprop_pool.add(ins_str)
-        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
-            self._write_nodeprops(db)
-
-    def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, float, int) -> int
-        ins_str = (node,resource,None,label,None,'F',None,None,None,value,None, None, ind)
-        #if ins_str not in self.done:
-        self.nodeprop_pool.add(ins_str)
-        #    self.done.add(ins_str)
-        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
-            self._write_nodeprops(db)
-
-    def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, datetime.datetime, int) -> int
-        ins_str = (node,resource,None,label,None,'T',None,None,None,None,value, None, ind)
-        #if ins_str not in self.done:
-        self.nodeprop_pool.add(ins_str)
-        #    self.done.add(ins_str)
-        if len(self.nodeprop_pool) > self.MAX_ELEMENTS:
-            self._write_nodeprops(db)
-
-    def add_edge(self, db, resource, source, label, dest):
-        # type: (cursor, str, str, str, str) -> int
-        logging.debug('Edge: (' + source + ',' + label +',' + dest + ')')
-        ins_str = (resource, source, dest, label)
-        self.edge_pool.add(ins_str)
-        if len(self.edge_pool) > self.MAX_ELEMENTS:
-            self._write_edges(db)
-
-    def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
-        return super().get_edges(db, resource)
-
-    def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
-        return super().get_nodes(db, resource)
-
-class CachingEventBindingProvenanceStore(EventBindingProvenanceStore):
     MAX_ELEMENTS = 16384
     done = set()
     nodeprop_pool = set()

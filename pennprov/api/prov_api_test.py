@@ -105,7 +105,7 @@ def test_main():
     ####  [i3] /
     ####
 
-def x_test_at_scale():
+def test_at_scale():
     mprov_conn.create_or_reset_graph()
     rows = []
     inx = 0
