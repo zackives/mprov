@@ -38,9 +38,15 @@ class MProvAgg:
         self.connection_key = connection_key or MProvConnectionCache.Key()
 
         # For Spark. Flush anything created on the driver node prior to computation.
-        mprov_conn = MProvConnectionCache.get_connection(self.connection_key);
+        mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
         if mprov_conn:
             mprov_conn.flush()
+
+    def __del__(self):
+        mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
+        if mprov_conn:
+            mprov_conn.flush()
+            print(f'FINALIZER FLUSH on decorator {id(self)}')
 
     def md_key(self, stream, key_list):
         if isinstance(stream, tuple) and len(stream) == 1:
