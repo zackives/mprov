@@ -372,6 +372,10 @@ class EventBindingProvenanceStore(ProvenanceStore):
     binding_queue = []
     total = 0
 
+    nodeprop_pool = set()
+    node_pool = set()
+    edge_pool = set()
+
     def create_tables(self, cursor):
         # type: (cursor) -> None
         # node_table = """
@@ -406,58 +410,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
                                                             UNIQUE (uvalue,index))
         """
 
-        #,                                                            UNIQUE (event,_resource,index,svalue)
-
-        # node_props_table = """
-        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_NodeProp(_key VARCHAR(80) NOT NULL,
-        #                                                    _resource VARCHAR(80) NOT NULL,
-        #                                                    type VARCHAR(80),
-        #                                                    label VARCHAR(80),
-        #                                                    value VARCHAR,
-        #                                                    code CHAR(1),
-        #                                                    ivalue INTEGER,
-        #                                                    lvalue BIGINT,
-        #                                                    dvalue DOUBLE PRECISION,
-        #                                                    fvalue REAL,
-        #                                                    tvalue DATE,
-        #                                                    tsvalue TIMESTAMP,
-        #                                                    index BIGINT,
-        #                                                    PRIMARY KEY(_resource, _key, label),
-        #                                                    UNIQUE(_resource,_key,index)
-        #                                                    )
-        #                    """
-
-        # edge_table = """
-        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Edge(_key SERIAL,
-        #                                                    _resource VARCHAR(80) NOT NULL,
-        #                                                    _from VARCHAR(80) NOT NULL,
-        #                                                    _to VARCHAR(80) NOT NULL,
-        #                                                    label VARCHAR(80),
-        #                                                    PRIMARY KEY(_resource, _key),
-        #                                                    UNIQUE(_resource, _from, _to, label)
-        #                                                    )
-        #              """
-
-        # edge_props_table = """
-        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_EdgeProp(_key INTEGER NOT NULL,
-        #                                                    _resource VARCHAR(80) NOT NULL,
-        #                                                    _created SERIAL,
-        #                                                    type VARCHAR(80),
-        #                                                    label VARCHAR(80),
-        #                                                    value VARCHAR,
-        #                                                    code CHAR(1),
-        #                                                    ivalue INTEGER,
-        #                                                    lvalue BIGINT,
-        #                                                    dvalue DOUBLE PRECISION,
-        #                                                    fvalue REAL,
-        #                                                    tvalue DATE,
-        #                                                    tsvalue TIMESTAMP,
-        #                                                    index BIGINT,
-        #                                                    PRIMARY KEY(_resource, _key, label),
-        #                                                    UNIQUE(_resource,_key,index)
-        #                                                    )
-        #                    """
-
         schema_table = """
                      CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
@@ -468,54 +420,61 @@ class EventBindingProvenanceStore(ProvenanceStore):
                                                            )
                        """
 
-        # cursor.execute(node_table)
         cursor.execute(event_table)
         cursor.execute(binding_table)
-        # cursor.execute(node_props_table)
-        # cursor.execute(edge_table)
-        # cursor.execute(edge_props_table)
         cursor.execute(schema_table)
         psycopg2.extras.register_uuid()
 
     def clear_tables(self, cursor, graph):
         # type: (cursor, str) -> None
-        # cursor.execute("DELETE FROM MProv_Node WHERE _resource = (%s)", (graph,))
-        # cursor.execute("DELETE FROM MProv_Edge WHERE _resource = (%s)", (graph,))
-        # cursor.execute("DELETE FROM MProv_NodeProp WHERE _resource = (%s)", (graph,))
         cursor.execute("DELETE FROM MProv_Binding", (graph, ))
         cursor.execute("DELETE FROM MProv_Event WHERE _resource = (%s)", (graph, ))
 
 
     def _add_node_binding(self, id, label, resource, args):
-        #self.binding_queue.append((id,resource,None,None,args,None,None,None,None,None,None))
-        self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
+        ins_str = (id,args,resource,label)
+        if ins_str not in self.node_pool:
+            self.node_pool.add(ins_str)
+            self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
 
     def _add_edge_binding(self, id, resource, source, label, dest):
-        uuid = self._get_id_from_key(source + '\\' + label + '\\' + dest)
-        self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,uuid,dest))
-        #self.binding_queue.append((id,0,None,source,None,None,None,None,None,None,uuid))
-        #self.binding_queue.append((id,1,None,dest,None,None,None,None,None,None,uuid))
+        ins_str = (id,source,resource,label,dest)
+        if ins_str not in self.edge_pool:
+            self.edge_pool.add(ins_str)
+            self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,None,dest))
         return
 
 
     def _add_node_property_str_binding(self, resource, id, node, label,  value, ind):
-        uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,ind,None,value,None,None,None,None,None,None,uuid,None))
+        ins_str = (id,resource,node,label,value,ind)
+        if ins_str not in self.nodeprop_pool:
+            self.nodeprop_pool.add(ins_str)
+            uuid = self._get_id_from_key(node + '\\' + label)
+            self.binding_queue.append((id,ind,None,value,None,None,None,None,None,None,uuid,None))
         return
 
     def _add_node_property_int_binding(self, resource, id, node, label,  value, ind):
-        uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,ind,None,None,value,None,None,None,None,None,uuid,None))
+        ins_str = (id,resource,node,label,value,ind)
+        if ins_str not in self.nodeprop_pool:
+            self.nodeprop_pool.add(ins_str)
+            uuid = self._get_id_from_key(node + '\\' + label)
+            self.binding_queue.append((id,ind,None,None,value,None,None,None,None,None,uuid,None))
         return
 
     def _add_node_property_float_binding(self, resource, id, node, label,  value, ind):
-        uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,ind,None,None,None,None,value,None,None,None,uuid,None))
+        ins_str = (id,resource,node,label,value,ind)
+        if ins_str not in self.nodeprop_pool:
+            self.nodeprop_pool.add(ins_str)
+            uuid = self._get_id_from_key(node + '\\' + label)
+            self.binding_queue.append((id,ind,None,None,None,None,value,None,None,None,uuid,None))
         return
 
     def _add_node_property_datetime_binding(self, resource, id, node, label,  value, ind):
-        uuid = self._get_id_from_key(node + '\\' + label)
-        self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
+        ins_str = (id,resource,node,label,value,ind)
+        if ins_str not in self.nodeprop_pool:
+            self.nodeprop_pool.add(ins_str)
+            uuid = self._get_id_from_key(node + '\\' + label)
+            self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
         return
 
     """
@@ -559,51 +518,10 @@ class EventBindingProvenanceStore(ProvenanceStore):
             raise Exception('Unknown type')
 
 
-    # def add_nodeprop_str(self, db, resource, node, label, value, ind=None):
-    #     # type: (cursor, str, str, str, str, int) -> int
-    #     if ind:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code,index) VALUES(%s,%s,%s,%s,'S',%s) ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value, ind))
-    #     else:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,value,code) VALUES(%s,%s,%s,%s,'S') ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value))
-
-    # def add_nodeprop_int(self, db, resource, node, label, value, ind=None):
-    #     # type: (cursor, str, str, str, int, int) -> int
-    #     if ind:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code,index) VALUES(%s,%s,%s,%s,'I',s) ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value, ind))
-    #     else:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,ivalue,code) VALUES(%s,%s,%s,%s,'I') ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value))
-
-    # def add_nodeprop_float(self, db, resource, node, label, value, ind=None):
-    #     # type: (cursor, str, str, str, float, int) -> int
-    #     if ind:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code,index) VALUES(%s,%s,%s,'F',%s) ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value, ind))
-    #     else:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,fvalue,code) VALUES(%s,%s,%s,'F') ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value))
-
-    # def add_nodeprop_date(self, db, resource, node, label, value, ind=None):
-    #     # type: (cursor, str, str, str, datetime.datetime, int) -> int
-    #     if ind:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code,index) VALUES(%s,%s,%s,%s,'T',%s) ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value, ind))
-    #     else:
-    #         return db.execute("INSERT INTO MProv_NodeProp(_key,_resource,label,tvalue,code) VALUES(%s,%s,%s,'T') ON CONFLICT DO NOTHING", \
-    #             (node, resource, label, value))
-
-    edge_count = 0
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
-        self.edge_count += 1
-        logging.info('Adding edge %s: (%s, %s, %s)' %(self.edge_count, source, label, dest))
         id = self._add_edge_event(db, resource, label, None)
         self._add_edge_binding(id, resource, source, label, dest)
-        #return db.execute("INSERT INTO MProv_Edge(_resource,_from,_to,label) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING", \
-        #    (resource, source, dest, label))
         return 1
 
     def get_provenance_data(self, db, resource, token):
@@ -736,7 +654,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def get_edges(self, db, resource):
         #type: (cursor, str) -> List[Tuple]
         self.flush(db)
-        #db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
         db.execute("""SELECT s.svalue,e.label,s.svalue2
                     FROM MProv_Binding s 
                         JOIN MProv_Event e ON s.event = e._key
@@ -754,9 +671,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
                         JOIN MProv_Event e ON s.event = e._key
                       WHERE e._resource = (%s) AND e.code = 'N'""", 
             (resource,))
-        # db.execute("""SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,n.label,np.label,np._key 
-        #     FROM MProv_Node n LEFT JOIN MProv_NodeProp np ON np._key = n._key WHERE np._resource = (%s)""", 
-        #     (resource,))
         ret = {}
 
         results = db.fetchall()
@@ -1061,3 +975,5 @@ class CompressingProvenanceStore(ProvenanceStore):
 
     def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
         return self.real_index.get_edges(db, resource)
+
+        

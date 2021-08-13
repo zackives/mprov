@@ -2,14 +2,14 @@
 
 mProv stores **provenance information** using the PROV-DM model.  This represents data and its associations with activities, agents (users), and other entities in a *graph*.  The graph conforms to a spec called [PROV-DM](https://www.w3.org/TR/prov-dm/).
 
-![example](images/prov-example.png)
+![example](images/test_main.png)
 
-The example above shows a screen capture of the Neo4J graph visualizer, for a provenance graph captured by mProv.  This
-graph currently omits the agent (user), but shows:
+The example above (you may wish to zoom in) shows a visualization of the provenance graph captured by mProv.  This not only shows the user, but also:
 
-* In the "diamond" shape on the left, we have a node at the top representing a *stream* or source.  This stream:
-  * Has two member tuples (below, as the left and right points of the "diamond").
-  * Has two annotations, in the upper left.  
+* In the "2D rectangle" shape on the top, we have a node at the top representing a *stream* or source as a collection.  As examples, this output stream:
+  * Has two sub-streams
+  * Has two member tuples (below, as yellow ellipses).
+  * Each substream has two annotations, in the upper left.  
 * The two stream tuples are aggregated into a sliding window or collection node, which is the bottom of the diamond.  Note that in the general case, not all tuples from a stream will be in the window.
 * A computation (represented with the brown node) uses the sliding window to generate an output (rightmost green node).
 * We record that the output was derived from the input window.
