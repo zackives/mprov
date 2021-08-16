@@ -80,14 +80,16 @@ class MProvConnectionCache:
     connections = {}
 
     @classmethod
-    def get_connection(cls, connection_key):
-        # type: (MProvConnectionCache.Key) -> MProvConnection
+    def get_connection(cls, connection_key, ensure_graph=False):
+        # type: (MProvConnectionCache.Key, bool) -> MProvConnection
         """
         Returns a cached MProvConnection for the given key if one has been previously cached.
         Otherwise, attempts to create, cache, and return a newly created connection.
         If the connection cannot be created, None is returned and the error is logged at the DEBUG level.
 
         :param connection_key: an MProvConnectionCache.Key
+        :param ensure_graph: if True, ensures graph exists by calling create_or_reuse when Connection is first 
+                             created, but not on subsequent gets. (optional, defaults to False)
         :return: the connection associated with connection_key or a newly created connection
         """
         connection = cls.connections.get(connection_key, None)
@@ -108,4 +110,11 @@ class MProvConnectionCache:
 
             if connection:
                 cls.connections[connection_key] = connection
+            if connection and ensure_graph:
+                connection.create_or_reuse_graph()
+                logger.debug(
+                    'MProvConnectionCache: process %s, connection %s ensured graph %s',
+                    os.getpid(),
+                    id(connection),
+                    connection.get_graph())
         return connection

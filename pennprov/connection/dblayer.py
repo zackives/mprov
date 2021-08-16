@@ -37,9 +37,9 @@ class ProvenanceStore:
         """
         Retrieve the appropriate provenance indexing subsystem
         """
-        return EventBindingProvenanceStore()
+        #return EventBindingProvenanceStore()
         #return CachingSQLProvenanceStore()
-        #return CompressingLogIndex(CachingLogIndex())
+        return NewProvenanceStore(CachingSQLProvenanceStore())
 
     def add_node(self, db, resource, label, skolem_args):
         # type: (cursor, str, str, str) -> None
@@ -83,6 +83,15 @@ class ProvenanceStore:
     def get_nodes(self, db, resource):
         #type: (cursor, str) -> List[Dict]
         return []
+
+    def _get_id(self):
+        # type: () -> UUID
+        return uuid.uuid4()
+
+    def _get_id_from_key(self, key):
+        # type: (str) -> UUID
+        return uuid.uuid5(uuid.NAMESPACE_URL, key)
+
 
 # TO DO:
 #  stream the update log
@@ -356,7 +365,7 @@ class SQLProvenanceStore(ProvenanceStore):
                 else:
                     raise RuntimeError('Unknown code ' + res[1])
 
-                logging.info("Node: " + str(ret))
+                logging.debug("Node: " + str(ret))
 
         return ret_list
 
@@ -378,13 +387,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def create_tables(self, cursor):
         # type: (cursor) -> None
-        # node_table = """
-        #              CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Node(_key VARCHAR(80) NOT NULL,
-        #                                                    _resource VARCHAR(80) NOT NULL,
-        #                                                    _created SERIAL,
-        #                                                    label VARCHAR(80),
-        #                                                    PRIMARY KEY(_resource, _key))
-        #              """
 
         event_table = """
                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Event(_key UUID PRIMARY KEY,
@@ -490,12 +492,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # We are going to create a unique node signature including the node
         #logging.debug('Node: ' + label + '(' + skolem_args + ')')
 
-        logging.info('Adding node %s:%s' %(label,node_identifier))
+        logging.debug('Adding node %s:%s' %(label,node_identifier))
         id = self._add_node_event(db, resource, label, node_identifier)
         self._add_node_binding(id, label, resource, node_identifier)
-
-        #return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
-        #    (node_identifier,resource,label))
         return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
@@ -504,19 +503,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
             return self._add_node_property_str_binding(resource, id, node, label,  value, ind)
-            #return self.add_nodeprop_str(db, resource, node, label, value, ind)
         elif isinstance(value, int):
             return self._add_node_property_int_binding(resource, id, node, label,  value, ind)
-            #return self.add_nodeprop_int(db, resource, node, label, value, ind)
         elif isinstance(value, float):
             return self._add_node_property_float_binding(resource, id, node, label,  value, ind)
-            #return self.add_nodeprop_float(db, resource, node, label, value, ind)
         elif isinstance(value, datetime.datetime):
             return self._add_node_property_datetime_binding(resource, id, node, label,  value, ind)
-            #return self.add_nodeprop_date(db, resource, node, label, value, ind)
         else:
             raise Exception('Unknown type')
-
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
@@ -718,14 +712,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self._write_bindings(db)
         return
 
-    def _get_id(self):
-        # type: () -> UUID
-        return uuid.uuid4()
-
-    def _get_id_from_key(self, key):
-        # type: (str) -> UUID
-        return uuid.uuid5(uuid.NAMESPACE_URL, key)
-
     def _add_node_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
@@ -860,7 +846,7 @@ class CompressingProvenanceStore(ProvenanceStore):
     #   op_type is one of: n(add_node), e(add_edge), p(add_prop), r(repeat), 2(seq_2), f(for), s(span)
     #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
     #   f(p_index,index), s(start_p_index,stop_p_index,index)
-    compression_table = [('n',(0))]
+    compression_table = []
     # token: (index, tok, binding_p1, prior_binding), ...
     binding_table = []
     # p_index: pred
@@ -883,7 +869,7 @@ class CompressingProvenanceStore(ProvenanceStore):
     last_node = None
 
     def __init__(self, r_index):
-        # type: (ProvenanceStore) -> None
+        # type: (EventBindingProvenanceStore) -> None
         self.real_index = r_index
 
     def create_tables(self, db):
@@ -894,24 +880,22 @@ class CompressingProvenanceStore(ProvenanceStore):
         # type: (cursor, str) -> None
         self.real_index.clear_tables(db, graph)
 
-    def add_node(self, db, resource, label, skolem_args):
+    def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
+
         ind = 0     # always use (n, 0)? TODO: expand to include repetition
-        self.binding_to_index[skolem_args] = ind
+        self.binding_to_index[node_id] = ind
         # TODO: push item to binding table
-        #return len(self.binding_table) - 1
-        self._add_log_event(('N',label),(skolem_args),db)
-        return self.real_index.add_node(db, resource, label, skolem_args)
+        self._add_log_event(('N',label),(node_id),db)
+        return self.real_index.add_node(db, resource, label, node_id)
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
-        #return len(self.binding_table) - 1
         self._add_log_event(('E',label),(source,dest),db)
         return self.real_index.add_edge(db, resource, source, label, dest)
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
-        #return len(self.binding_table) - 1
         self._add_log_event(('P',label,ind),(node,value),db)
         return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
 
@@ -976,4 +960,120 @@ class CompressingProvenanceStore(ProvenanceStore):
     def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
         return self.real_index.get_edges(db, resource)
 
-        
+
+class NewProvenanceStore(ProvenanceStore):
+    # Basic format:
+    # index -> (op_type, (tokens))
+    #   op_type is one of: n(add_node), e(add_edge), p(add_prop), r(repeat), 2(seq_2), f(for), s(span)
+    #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
+    #   f(p_index,index), s(start_p_index,stop_p_index,index)
+
+    real_index = None
+
+    # Node ID --> op
+    op_graph = {}
+
+    event_sets = {}
+    inverse_events = {}
+
+    nodes_to_events = {}
+    events_to_nodes = []
+
+    def __init__(self, r_index):
+        # type: (EventBindingProvenanceStore) -> None
+        self.real_index = r_index
+
+    def create_tables(self, db):
+        # type: (cursor) -> None
+        self.real_index.create_tables(db)
+
+    def clear_tables(self, db, graph):
+        # type: (cursor, str) -> None
+        self.real_index.clear_tables(db, graph)
+
+    # TODO:  we start with a base event.  It has a UUID and we create an eventset + a binding
+
+    def _extend_event_set(self, tuple, existing_set):
+        """
+        Copy an event set node and add more items
+        """
+
+        result = set([tuple])
+
+        if existing_set:
+            #self.event_sets[uuid].add(('A',existing_set))
+            result = set.union(result, self.event_sets[existing_set])
+
+        result = frozenset(result)
+
+        if result not in self.inverse_events:
+            uuid = self._get_id()
+            self.inverse_events[result] = uuid
+            self.event_sets[uuid] = result
+        else:
+            return self.inverse_events[result]
+
+        return uuid
+
+    def _find_event_set(self, id):
+        if id in self.nodes_to_events:
+            return self.nodes_to_events[id]
+        else:
+            return set()
+
+    def add_node(self, db, resource, label, node_id):
+        # type: (cursor, str, str, str) -> int
+
+        existing_set = self._find_event_set((node_id,))
+        self.nodes_to_events[(node_id,)] = self._extend_event_set(('N',label),existing_set)
+
+        return self.real_index.add_node(db, resource, label, node_id)
+
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> int
+
+        existing_set = self._find_event_set((source,dest))
+        self.nodes_to_events[(source,dest)] = self._extend_event_set(('E',source,dest),existing_set)
+
+        if not existing_set:
+            # TODO: find everything from the left endpoint; find everything from the right endpoint
+            pass
+
+        return self.real_index.add_edge(db, resource, source, label, dest)
+
+    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, Any, int) -> int
+
+        existing_set = self._find_event_set((node,))
+        self.nodes_to_events[(node,)] = self._extend_event_set(('P',label,value),existing_set)
+
+        return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
+
+    def flush(self, db):
+        #logging.info(self.nodes_to_events)
+        #logging.info(self.event_sets)
+        # type: (cursor) -> None
+        self.real_index.flush(db)
+
+    def get_provenance_data(self, db, resource, token):
+        # type: (cursor, str, str) -> List[Dict]
+        self.real_index.flush(db)
+        return self.real_index.get_provenance_data(db, resource, token)
+
+    def get_connected_to(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        self.real_index.flush(db)
+        return self.real_index.get_connected_from(db, resource, token, label1)
+
+    def get_connected_from(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        self.real_index.flush(db)
+        return self.real_index.get_connected_to(db, resource, token, label1)
+
+    def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
+        self.real_index.flush(db)
+        return self.real_index.get_nodes(db, resource)
+
+    def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
+        self.real_index.flush(db)
+        return self.real_index.get_edges(db, resource)

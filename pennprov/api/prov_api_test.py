@@ -26,9 +26,10 @@ sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
 mprov_conn.add_to_collection(sub_stream_1, main_stream)
 mprov_conn.add_to_collection(sub_stream_2, main_stream)
 
-def test_main():
+def x_test_main():
     global mprov_conn
 
+    mprov_conn.create_or_reset_graph()
     main_stream = mprov_conn.create_collection('output_ecg')
     sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
     sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
@@ -38,8 +39,8 @@ def test_main():
     # Test the decorators, which will create entities for the dataframe
     # elements, and nodes representing the dataframe components
     ecg = pd.DataFrame([{'x':1, 'y': 2}, {'x':3, 'y':4}])
-    test(ecg)
-    testx(ecg)
+    tst(ecg)
+    tstx(ecg)
 
     mprov_conn.store_annotations(sub_stream_1, {'name': 'ecg', 'date': '01-01-01'})
     mprov_conn.store_annotations(sub_stream_2, {'name': 'eeg', 'date': '01-01-05'})
@@ -114,8 +115,8 @@ def test_at_scale():
         for j in range(0, 10):
             rows = rows + [{'id': inx, 'x': i, 'y': j}]
             ecg = pd.DataFrame(rows)
-            test(ecg)
-            testx(ecg)
+            tst(ecg)
+            tstx(ecg)
             inx = inx + 1
 
     mprov_conn.flush()
@@ -123,12 +124,10 @@ def test_at_scale():
     print('Finished after %s' %(datetime.now()-start))
 
 @MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
-@pytest.mark.skip(reason="Not a test fn")
-def test(n):
+def tst(n):
     return n.groupby('x').count()
 
 @MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
-@pytest.mark.skip(reason="Not a test fn")
-def testx(n):
+def tstx(n):
     return n.groupby('x').count()
 
