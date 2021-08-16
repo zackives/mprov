@@ -44,7 +44,7 @@ class MProvAgg:
 
     def __del__(self):
         mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
-        if mprov_conn:
+        if mprov_conn and sys.meta_path:
             mprov_conn.flush()
             print(f'FINALIZER FLUSH on decorator {id(self)}')
 

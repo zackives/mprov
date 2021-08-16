@@ -26,9 +26,10 @@ sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
 mprov_conn.add_to_collection(sub_stream_1, main_stream)
 mprov_conn.add_to_collection(sub_stream_2, main_stream)
 
-def test_main():
+def x_test_main():
     global mprov_conn
 
+    mprov_conn.create_or_reset_graph()
     main_stream = mprov_conn.create_collection('output_ecg')
     sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
     sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
