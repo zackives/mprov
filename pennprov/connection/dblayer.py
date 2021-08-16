@@ -39,7 +39,7 @@ class ProvenanceStore:
         """
         #return EventBindingProvenanceStore()
         #return CachingSQLProvenanceStore()
-        return NewProvenanceStore(CachingSQLProvenanceStore())
+        return NewProvenanceStore(EventBindingProvenanceStore())
 
     def add_node(self, db, resource, label, skolem_args):
         # type: (cursor, str, str, str) -> None
@@ -387,7 +387,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def create_tables(self, cursor):
         # type: (cursor) -> None
-
         event_table = """
                     CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Event(_key UUID PRIMARY KEY,
                                                             _resource VARCHAR(80) NOT NULL,
@@ -434,12 +433,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
 
     def _add_node_binding(self, id, label, resource, args):
-        ins_str = (id,args,resource,label)
+        # type: (str, str, str, str, str) -> None
+        ins_str = (id,resource,label,args)
         if ins_str not in self.node_pool:
             self.node_pool.add(ins_str)
             self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
 
     def _add_edge_binding(self, id, resource, source, label, dest):
+        # type: (str, str, str, str, str) -> None
         ins_str = (id,source,resource,label,dest)
         if ins_str not in self.edge_pool:
             self.edge_pool.add(ins_str)
@@ -448,7 +449,8 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
 
     def _add_node_property_str_binding(self, resource, id, node, label,  value, ind):
-        ins_str = (id,resource,node,label,value,ind)
+        # type: (str, str, str, str, str, int) -> None
+        ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
             uuid = self._get_id_from_key(node + '\\' + label)
@@ -456,7 +458,8 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return
 
     def _add_node_property_int_binding(self, resource, id, node, label,  value, ind):
-        ins_str = (id,resource,node,label,value,ind)
+        # type: (str, str, str, str, int, int) -> None
+        ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
             uuid = self._get_id_from_key(node + '\\' + label)
@@ -464,7 +467,8 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return
 
     def _add_node_property_float_binding(self, resource, id, node, label,  value, ind):
-        ins_str = (id,resource,node,label,value,ind)
+        # type: (str, str, str, str, float, int) -> None
+        ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
             uuid = self._get_id_from_key(node + '\\' + label)
@@ -472,16 +476,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return
 
     def _add_node_property_datetime_binding(self, resource, id, node, label,  value, ind):
-        ins_str = (id,resource,node,label,value,ind)
+        # type: (str, str, str, str, datetime, int) -> None
+        ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
             uuid = self._get_id_from_key(node + '\\' + label)
             self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
         return
 
-    """
-    Pass-through interface for provenance event logs
-    """
     def add_node(self, db, resource, label, node_identifier):
         # type: (cursor, str, str, str) -> int
         """
@@ -993,7 +995,7 @@ class NewProvenanceStore(ProvenanceStore):
 
     # TODO:  we start with a base event.  It has a UUID and we create an eventset + a binding
 
-    def _extend_event_set(self, tuple, existing_set):
+    def _extend_event_set(self, db, resource, tuple, existing_set):
         """
         Copy an event set node and add more items
         """
@@ -1006,6 +1008,11 @@ class NewProvenanceStore(ProvenanceStore):
 
         result = frozenset(result)
 
+        if tuple[0] == 'N':
+            uuid = self.real_index._add_node_event(db, resource, tuple[1], '')
+        else:
+            uuid = self.real_index._add_node_property_event(db, resource, tuple[1], tuple[2])
+
         if result not in self.inverse_events:
             uuid = self._get_id()
             self.inverse_events[result] = uuid
@@ -1015,7 +1022,31 @@ class NewProvenanceStore(ProvenanceStore):
 
         return uuid
 
-    def _find_event_set(self, id):
+    def _extend_event_set_edge(self, db, resource, tuple, existing_set):
+        """
+        Copy an event set node and add more items
+        """
+
+        result = set([tuple])
+
+        if existing_set:
+            #self.event_sets[uuid].add(('A',existing_set))
+            result = set.union(result, self.event_sets[existing_set])
+
+        result = frozenset(result)
+
+        uuid = self.real_index._add_edge_event(db, resource, tuple[1], tuple[2])
+
+        if result not in self.inverse_events:
+            uuid = self._get_id()
+            self.inverse_events[result] = uuid
+            self.event_sets[uuid] = result
+        else:
+            return self.inverse_events[result]
+
+        return uuid
+
+    def _find_event_set(self, db, resource, id):
         if id in self.nodes_to_events:
             return self.nodes_to_events[id]
         else:
@@ -1024,16 +1055,16 @@ class NewProvenanceStore(ProvenanceStore):
     def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
 
-        existing_set = self._find_event_set((node_id,))
-        self.nodes_to_events[(node_id,)] = self._extend_event_set(('N',label),existing_set)
+        existing_set = self._find_event_set(db, resource, (node_id,))
+        self.nodes_to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
 
         return self.real_index.add_node(db, resource, label, node_id)
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
 
-        existing_set = self._find_event_set((source,dest))
-        self.nodes_to_events[(source,dest)] = self._extend_event_set(('E',source,dest),existing_set)
+        existing_set = self._find_event_set(db, resource, (source,dest))
+        self.nodes_to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
 
         if not existing_set:
             # TODO: find everything from the left endpoint; find everything from the right endpoint
@@ -1044,8 +1075,8 @@ class NewProvenanceStore(ProvenanceStore):
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
 
-        existing_set = self._find_event_set((node,))
-        self.nodes_to_events[(node,)] = self._extend_event_set(('P',label,value),existing_set)
+        existing_set = self._find_event_set(db, resource, (node,))
+        self.nodes_to_events[(node,)] = self._extend_event_set(db, resource, ('P',label,value),existing_set)
 
         return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
 
