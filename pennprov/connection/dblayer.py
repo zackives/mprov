@@ -13,9 +13,13 @@
 
 from __future__ import print_function
 
-from typing import List, Any, Dict, Tuple
+from typing import List, Any, Dict, Tuple, Mapping, Callable
 import logging
+import os
+
 import pennprov
+from pennprov.config import config
+
 import datetime
 
 import uuid
@@ -27,19 +31,37 @@ from psycopg2.extensions import cursor
 from psycopg2.extras import execute_values
 import psycopg2.extras
 
+class Factory:
+    registered_index_types = dict() # type: Mapping[str, Callable[[], ProvenanceStore]]
+
+    @classmethod 
+    def register_index_type(cls, key, creator):
+        # type: (str, Callable[[], ProvenanceStore]) -> None 
+        cls.registered_index_types[key.lower()] = creator
+
+    @classmethod
+    def get_index(cls):
+        # type: () -> ProvenanceStore
+        """
+        Retrieve the appropriate provenance indexing subsystem
+        """
+        key = os.environ.get('MPROV_INDEX')
+        if key is None:
+            key = config.provenance.get('index', 'new')
+
+        creator = cls.registered_index_types.get(key.lower())
+
+        if creator is None:
+            raise ValueError(f'no creator registered for {key}')
+        return creator()
+
+
 class ProvenanceStore:
     """
     A persistent provenance graph storage subsystem.
     """
 
-    def get_index():
-        # type: () -> ProvenanceStore
-        """
-        Retrieve the appropriate provenance indexing subsystem
-        """
-        #return EventBindingProvenanceStore()
-        #return CachingSQLProvenanceStore()
-        return NewProvenanceStore(EventBindingProvenanceStore())
+    Factory.register_index_type('no-op', lambda: ProvenanceStore())
 
     def add_node(self, db, resource, label, skolem_args):
         # type: (cursor, str, str, str) -> None
@@ -107,6 +129,7 @@ class SQLProvenanceStore(ProvenanceStore):
     """
     Writes the provenance graph to a PostgreSQL back-end.
     """
+    Factory.register_index_type('sql', lambda: SQLProvenanceStore())
 
     def create_tables(self, cursor):
         # type: (cursor) -> None
@@ -376,6 +399,8 @@ class SQLProvenanceStore(ProvenanceStore):
 
 
 class EventBindingProvenanceStore(ProvenanceStore):
+
+    Factory.register_index_type('event-binding', lambda: EventBindingProvenanceStore())
 
     event_queue = []
     binding_queue = []
@@ -737,6 +762,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return id
 
 class CachingSQLProvenanceStore(SQLProvenanceStore):
+
+    Factory.register_index_type('caching', lambda: CachingSQLProvenanceStore())
+
     MAX_ELEMENTS = 16384
     done = set()
     nodeprop_pool = set()
@@ -748,15 +776,15 @@ class CachingSQLProvenanceStore(SQLProvenanceStore):
     def flush(self, db):
         # type: (cursor) -> None
         if len(self.node_pool) > 0:
-            print('Flushing nodes...')
+            logging.debug('Flushing nodes...')
             self._write_nodes(db)
         if len(self.edge_pool) > 0:
-            print('Flushing edges...')
+            logging.debug('Flushing edges...')
             self._write_edges(db)
         if len(self.nodeprop_pool) > 0:
-            print('Flushing node properties...')
+            logging.debug('Flushing node properties...')
             self._write_nodeprops(db)
-        print ('Total flushed: %d'%self.total)
+        logging.debug('Total flushed: %d'%self.total)
 
     def _write_nodes(self, db):
         # type: (cursor) -> None
@@ -870,6 +898,9 @@ class CompressingProvenanceStore(ProvenanceStore):
     real_index = None
     last_node = None
 
+    Factory.register_index_type('compressing', lambda: CompressingProvenanceStore(EventBindingProvenanceStore()))
+
+
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
         self.real_index = r_index
@@ -980,6 +1011,9 @@ class NewProvenanceStore(ProvenanceStore):
 
     nodes_to_events = {}
     events_to_nodes = []
+
+    Factory.register_index_type('new', lambda: NewProvenanceStore(EventBindingProvenanceStore()))
+
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None

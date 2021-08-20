@@ -9,4 +9,5 @@ provenance:
  graph: mProv-graph
  user: YOUR_USERNAME2
  password: YOUR_PASSWORD
+ index: new # -> NewProvenanceStore. See pennprov/connection/dblayer.py for alternatives.
 

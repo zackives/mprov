@@ -24,7 +24,7 @@ from pennprov.metadata.stream_metadata import BasicTuple
 import psycopg2
 from pennprov.config import config
 
-from pennprov.connection.dblayer import ProvenanceStore
+from pennprov.connection.dblayer import ProvenanceStore, Factory
 
 class MProvConnection:
     graph_name = None
@@ -33,7 +33,7 @@ class MProvConnection:
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
 
     #log = LogIndex()
-    log = ProvenanceStore.get_index()
+    log = Factory.get_index() # type: ProvenanceStore
     #log = CompressingLogIndex()
 
     """
