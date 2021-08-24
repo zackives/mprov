@@ -78,6 +78,9 @@ class ProvenanceStore:
     def flush(self, db):
         return
 
+    def reset(self):
+        return
+
     def create_tables(self, cursor):
         # type: (cursor) -> None
         return
@@ -761,6 +764,15 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.event_queue.append((id, resource, 'P', label, None))#args))
         return id
 
+    def reset(self):
+        self.event_queue = []
+        self.binding_queue = []
+        self.total = 0
+
+        self.nodeprop_pool = set()
+        self.node_pool = set()
+        self.edge_pool = set()
+
 class CachingSQLProvenanceStore(SQLProvenanceStore):
 
     Factory.register_index_type('caching', lambda: CachingSQLProvenanceStore())
@@ -869,6 +881,13 @@ class CachingSQLProvenanceStore(SQLProvenanceStore):
 
     def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
         return super().get_nodes(db, resource)
+
+    def reset(self):
+        self.done = set()
+        self.nodeprop_pool = set()
+        self.node_pool = set()
+        self.edge_pool = set()
+        self.total = 0
 
 class CompressingProvenanceStore(ProvenanceStore):
     # Basic format:
@@ -1003,17 +1022,14 @@ class NewProvenanceStore(ProvenanceStore):
 
     real_index = None
 
-    # Node ID --> op
-    op_graph = {}
+    event_sets = {}         # type: Mapping[uuid, Set(Tuple)]
+    inverse_events = {}     # type: Mapping[Set(Tuple), uuid]
 
-    event_sets = {}
-    inverse_events = {}
-
-    nodes_to_events = {}
-    events_to_nodes = []
+    # Every node was created according to some event ID (which might also lead to many other things)
+    to_events = {}
+    from_events = []
 
     Factory.register_index_type('new', lambda: NewProvenanceStore(EventBindingProvenanceStore()))
-
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
@@ -1034,24 +1050,29 @@ class NewProvenanceStore(ProvenanceStore):
         Copy an event set node and add more items
         """
 
+        # A singleton set with the event tuple
         result = set([tuple])
 
+        # Look up any items from the prior set (look up by its ID) and add
+        # them to our set in the lattice
         if existing_set:
-            #self.event_sets[uuid].add(('A',existing_set))
             result = set.union(result, self.event_sets[existing_set])
 
         result = frozenset(result)
 
+        # Are we adding a node event, or a node property event?
         if tuple[0] == 'N':
             uuid = self.real_index._add_node_event(db, resource, tuple[1], '')
         else:
             uuid = self.real_index._add_node_property_event(db, resource, tuple[1], tuple[2])
 
         if result not in self.inverse_events:
+            # New event set
             uuid = self._get_id()
             self.inverse_events[result] = uuid
             self.event_sets[uuid] = result
         else:
+            # Reuse
             return self.inverse_events[result]
 
         return uuid
@@ -1064,7 +1085,6 @@ class NewProvenanceStore(ProvenanceStore):
         result = set([tuple])
 
         if existing_set:
-            #self.event_sets[uuid].add(('A',existing_set))
             result = set.union(result, self.event_sets[existing_set])
 
         result = frozenset(result)
@@ -1081,8 +1101,8 @@ class NewProvenanceStore(ProvenanceStore):
         return uuid
 
     def _find_event_set(self, db, resource, id):
-        if id in self.nodes_to_events:
-            return self.nodes_to_events[id]
+        if id in self.to_events:
+            return self.to_events[id]
         else:
             return set()
 
@@ -1090,7 +1110,7 @@ class NewProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, str) -> int
 
         existing_set = self._find_event_set(db, resource, (node_id,))
-        self.nodes_to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
+        self.to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
 
         return self.real_index.add_node(db, resource, label, node_id)
 
@@ -1098,10 +1118,14 @@ class NewProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, str, str) -> int
 
         existing_set = self._find_event_set(db, resource, (source,dest))
-        self.nodes_to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
+        self.to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
 
         if not existing_set:
             # TODO: find everything from the left endpoint; find everything from the right endpoint
+
+
+            # Otherwise, we have a subgraph, where we take a *list of nodes* associated with the
+            # left, a *list of nodes* associated with the right, and all edges between
             pass
 
         return self.real_index.add_edge(db, resource, source, label, dest)
@@ -1110,12 +1134,12 @@ class NewProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, str, Any, int) -> int
 
         existing_set = self._find_event_set(db, resource, (node,))
-        self.nodes_to_events[(node,)] = self._extend_event_set(db, resource, ('P',label,value),existing_set)
+        self.to_events[(node,)] = self._extend_event_set(db, resource, ('P',label,value),existing_set)
 
         return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
 
     def flush(self, db):
-        #logging.info(self.nodes_to_events)
+        #logging.info(self.to_events)
         #logging.info(self.event_sets)
         # type: (cursor) -> None
         self.real_index.flush(db)
@@ -1142,3 +1166,11 @@ class NewProvenanceStore(ProvenanceStore):
     def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
         self.real_index.flush(db)
         return self.real_index.get_edges(db, resource)
+
+    def reset(self):
+        self.event_sets = {}
+        self.inverse_events = {}
+        self.to_events = {}
+        self.from_events = []
+        self.real_index.reset()
+

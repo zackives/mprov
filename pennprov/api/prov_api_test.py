@@ -108,10 +108,16 @@ def x_test_main():
 
 def test_at_scale():
     mprov_conn.create_or_reset_graph()
+    main_stream = mprov_conn.create_collection('output_ecg')
+    sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
+    sub_stream_2 = mprov_conn.create_collection('output_ecg_2', 1)
+    mprov_conn.add_to_collection(sub_stream_1, main_stream)
+    mprov_conn.add_to_collection(sub_stream_2, main_stream)
+
     rows = []
     inx = 0
     start = datetime.now()
-    for i in range(0, 10):
+    for i in range(0, 1):
         for j in range(0, 10):
             rows = rows + [{'id': inx, 'x': i, 'y': j}]
             ecg = pd.DataFrame(rows)
@@ -120,7 +126,8 @@ def test_at_scale():
             inx = inx + 1
 
     mprov_conn.flush()
-    #mprov_conn.get_dot("test_at_scale.dot")
+
+    mprov_conn.get_dot("test_at_scale.dot")
     print('Finished after %s' %(datetime.now()-start))
 
 @MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)

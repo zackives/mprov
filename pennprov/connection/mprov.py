@@ -75,6 +75,8 @@ class MProvConnection:
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 self.log.clear_tables(cursor,self.get_graph())
+        
+        self.log.reset()
         try:
             self.store_agent(self.get_username())
         except psycopg2.errors.UniqueViolation:
