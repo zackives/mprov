@@ -43,10 +43,11 @@ class MProvAgg:
             mprov_conn.flush()
 
     def __del__(self):
-        mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
-        if mprov_conn and sys.meta_path:
-            mprov_conn.flush()
-            logging.debug(f'FINALIZER FLUSH on decorator {id(self)}')
+        if self.connection_key and MProvConnectionCache:
+            mprov_conn = MProvConnectionCache.get_connection(self.connection_key)
+            if mprov_conn and sys.meta_path:
+                mprov_conn.flush()
+                logging.debug(f'FINALIZER FLUSH on decorator {id(self)}')
 
     def md_key(self, stream, key_list):
         if isinstance(stream, tuple) and len(stream) == 1:
