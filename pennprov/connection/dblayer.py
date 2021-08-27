@@ -13,7 +13,7 @@
 
 from __future__ import print_function
 
-from typing import List, Any, Dict, Tuple, Mapping, Callable
+from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 import logging
 import os
 
@@ -1022,8 +1022,8 @@ class NewProvenanceStore(ProvenanceStore):
 
     real_index = None
 
-    event_sets = {}         # type: Mapping[uuid, Set(Tuple)]
-    inverse_events = {}     # type: Mapping[Set(Tuple), uuid]
+    event_sets = {}         # type: Mapping[UUID, Set(Tuple)]
+    inverse_events = {}     # type: Mapping[Set(Tuple), UUID]
 
     # Every node was created according to some event ID (which might also lead to many other things)
     to_events = {}
