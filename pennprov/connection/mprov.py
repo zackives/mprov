@@ -170,19 +170,19 @@ class MProvConnection:
 
     def store_agent(self, agent_name):
         # type: (str) -> str
-        agent_key = self._get_qname(self.user_token)
+        agent_key = self._get_qname(agent_name)#self.user_token)
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 self.log.add_node(cursor, self.get_graph(), 'AGENT', agent_key)
 
                 key = self._get_qname('agent_name')
-                value = self.user_token
+                value = agent_name#self.user_token
                 
                 self.log.add_nodeprop(cursor, self.get_graph(), agent_key, key, value,0)
 
         logging.debug('Storing AGENT %s' % str(self.user_token))
 
-        return self.user_token
+        return agent_key#self.user_token
 
     def store_activity(self,
                        activity,
