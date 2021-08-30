@@ -180,7 +180,7 @@ class MProvConnection:
                 
                 self.log.add_nodeprop(cursor, self.get_graph(), agent_key, key, value,0)
 
-        logging.debug('Storing AGENT %s' % str(self.user_token))
+        logging.debug('Storing AGENT %s' % str(agent_key))
 
         return agent_key#self.user_token
 

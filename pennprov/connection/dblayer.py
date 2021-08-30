@@ -13,7 +13,7 @@
 
 from __future__ import print_function
 
-from typing import List, Any, Dict, Tuple, Mapping, Callable
+from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 import logging
 import os
 
@@ -544,7 +544,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
-        id = self._add_edge_event(db, resource, label, None)
+        id = self._add_edge_event(db, resource, label, dest)
         self._add_edge_binding(id, resource, source, label, dest)
         return 1
 
@@ -1020,6 +1020,10 @@ class NewProvenanceStore(ProvenanceStore):
     #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
     #   f(p_index,index), s(start_p_index,stop_p_index,index)
 
+    # Unique UUID space for this thread / context
+    uuid = None
+    binding = 0
+
     real_index = None
 
     event_sets = {}         # type: Mapping[uuid, Set(Tuple)]
@@ -1030,10 +1034,26 @@ class NewProvenanceStore(ProvenanceStore):
     from_events = []
 
     Factory.register_index_type('new', lambda: NewProvenanceStore(EventBindingProvenanceStore()))
+    # ID to EVENT SET
+    event_sets = {}
+    # EVENT SET to ID
+    inverse_events = {}
+
+    # Given a node, what is the EVENT SET associated with it.
+    nodes_to_events = {}
+    # Which nodes match the EVENT SET
+    events_to_nodes = []
+
+    live_nodes = []
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
         self.real_index = r_index
+        self.uuid = uuid.uuid4().int
+
+    def _get_uuid(self):
+        self.uuid = self.uuid + 1
+        return self.uuid -1
 
     def create_tables(self, db):
         # type: (cursor) -> None
@@ -1067,8 +1087,8 @@ class NewProvenanceStore(ProvenanceStore):
             uuid = self.real_index._add_node_property_event(db, resource, tuple[1], tuple[2])
 
         if result not in self.inverse_events:
-            # New event set
-            uuid = self._get_id()
+            uuid = self._get_uuid()
+
             self.inverse_events[result] = uuid
             self.event_sets[uuid] = result
         else:
@@ -1089,20 +1109,21 @@ class NewProvenanceStore(ProvenanceStore):
 
         result = frozenset(result)
 
-        uuid = self.real_index._add_edge_event(db, resource, tuple[1], tuple[2])
+        #uuid = self.real_index._add_edge_event(db, resource, tuple[1], tuple[2])
 
         if result not in self.inverse_events:
             uuid = self._get_id()
             self.inverse_events[result] = uuid
             self.event_sets[uuid] = result
+            return uuid
         else:
             return self.inverse_events[result]
 
-        return uuid
 
     def _find_event_set(self, db, resource, id):
-        if id in self.to_events:
-            return self.to_events[id]
+        # type: (str, str, Tuple) -> Set[Any]
+        if id in self.nodes_to_events:
+            return self.nodes_to_events[id]
         else:
             return set()
 
@@ -1111,6 +1132,8 @@ class NewProvenanceStore(ProvenanceStore):
 
         existing_set = self._find_event_set(db, resource, (node_id,))
         self.to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
+
+        self.live_nodes.append(node_id)
 
         return self.real_index.add_node(db, resource, label, node_id)
 

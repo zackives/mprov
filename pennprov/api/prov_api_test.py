@@ -106,7 +106,7 @@ def x_test_main():
     ####  [i3] /
     ####
 
-def test_at_scale():
+def x_test_at_scale():
     mprov_conn.create_or_reset_graph()
     main_stream = mprov_conn.create_collection('output_ecg')
     sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
