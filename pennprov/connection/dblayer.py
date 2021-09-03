@@ -94,11 +94,19 @@ class ProvenanceStore:
         return
 
     def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         return
 
     def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
+        return
+
+    def get_connected_to_labeled(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        return
+
+    def get_connected_from_labe(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
         return
 
     def get_edges(self, db, resource):
@@ -318,7 +326,7 @@ class SQLProvenanceStore(ProvenanceStore):
         return [ret]
 
     def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.flush(db)
         if label1 is None:
             db.execute("SELECT _from FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s)", (resource,token))
@@ -328,7 +336,7 @@ class SQLProvenanceStore(ProvenanceStore):
         return [x[0] for x in db.fetchall()]
 
     def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.flush(db)
         if label1 is None:
             db.execute("SELECT _to FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s)", (resource,token))
@@ -336,6 +344,26 @@ class SQLProvenanceStore(ProvenanceStore):
             db.execute("SELECT _to FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s) AND label = (%s)",
                             (resource, token, label1))
         return [x[0] for x in db.fetchall()]
+
+    def get_connected_to_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        self.flush(db)
+        if label1 is None:
+            db.execute("SELECT _from,label FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s)", (resource,token))
+        else:
+            db.execute("SELECT _from,label FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s) AND label = (%s)",
+                            (resource, token, label1))
+        return [(x[0],x[1]) for x in db.fetchall()]
+
+    def get_connected_to(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        self.flush(db)
+        if label1 is None:
+            db.execute("SELECT _to,label FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s)", (resource,token))
+        else:
+            db.execute("SELECT _to,label FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s) AND label = (%s)",
+                            (resource, token, label1))
+        return [(x[0],x[1]) for x in db.fetchall()]
 
     def get_edges(self, db, resource):
         #type: (cursor, str) -> List[Tuple]
@@ -613,7 +641,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
 
     def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.flush(db)
         if label1 is None:
             # Need to start with the DEST
@@ -634,7 +662,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return [x[1] for x in db.fetchall()]
 
     def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.flush(db)
         if label1 is None:
             # Need to start with the SOURCE
@@ -654,6 +682,49 @@ class EventBindingProvenanceStore(ProvenanceStore):
                 (resource,token,label1))
 
         return [x[1] for x in db.fetchall()]
+
+    def get_connected_to_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        self.flush(db)
+        if label1 is None:
+            # Need to start with the DEST
+            db.execute("""SELECT s.index,s.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND s.svalue2 = %s""", 
+                (resource,token))
+        else:
+        # Need to start with the DEST
+            db.execute("""SELECT s.index,s.svalue,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue2 = %s AND e.label=%s""", 
+                (resource,token,label1))
+
+        return [(x[1],x[2]) for x in db.fetchall()]
+
+    def get_connected_from_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        self.flush(db)
+        if label1 is None:
+            # Need to start with the SOURCE
+            db.execute("""SELECT s.index,s.svalue2,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue = %s""", 
+                (resource,token))
+        else:
+        # Need to start with the SOURCE
+            db.execute("""SELECT s.index,s.svalue2,e.label 
+                        FROM MProv_Binding s 
+                            JOIN MProv_Event e ON s.event = e._key
+                        WHERE e._resource = (%s) AND e.code = 'E' AND 
+                            s.svalue = %s AND e.label=%s""", 
+                (resource,token,label1))
+
+        return [(x[1],x[2]) for x in db.fetchall()]
 
     def _write_events(self, db):
         # type: (cursor) -> None
@@ -1002,12 +1073,20 @@ class CompressingProvenanceStore(ProvenanceStore):
         return self.real_index.get_provenance_data(db, resource, token)
 
     def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         return self.real_index.get_connected_from(db, resource, token, label1)
 
     def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         return self.real_index.get_connected_to(db, resource, token, label1)
+
+    def get_connected_to_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple[str,str]]
+        return self.real_index.get_connected_from_label(db, resource, token, label1)
+
+    def get_connected_from_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple[str,str]]
+        return self.real_index.get_connected_to_label(db, resource, token, label1)
 
     def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
         return self.real_index.get_nodes(db, resource)
@@ -1047,7 +1126,9 @@ class NewProvenanceStore(ProvenanceStore):
     # Which nodes match the EVENT SET
     events_to_nodes = []
 
-    live_nodes = []
+    graph_nodes = []
+    internal_edges = []
+    external_edges = []
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
@@ -1136,15 +1217,56 @@ class NewProvenanceStore(ProvenanceStore):
         existing_set = self._find_event_set(db, resource, (node_id,))
         self.to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
 
-        self.live_nodes.append(node_id)
+        self.graph_nodes.append(node_id)
 
         return self.real_index.add_node(db, resource, label, node_id)
+
+    def _add_external_edges(self, db, resource, node_id):
+        # type: (cursor, str, str) -> None
+        """
+        Given a new frontier node, find any adjacent edges and add them
+        to our external-facing set
+        """
+        for (src,label) in self.get_connected_from_label(db, resource, node_id):
+            self.external_edges.append((src,label,node_id))
+
+        for (dest,label) in self.get_connected_to_label(db, resource, node_id):
+            self.external_edges.append((node_id,label,dest))
+        return
+
+    def _reclassify_edges(self, db, resource, source, dest):
+        """
+        Ensure that any edges that were previously external-facing
+        are now internal edges
+        """
+        remov = set()
+        for i in range(0, len(self.external_edges)):
+            (src,label,dst) = self.external_edges[i]
+            if src == source and dst == dest:
+                self.internal_edges.append(source,label,dest)
+                remov.add((src,label,dst))
+
+        for edge in remov:
+            self.external_edges.remove(remov)
+        
+        return
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
 
         existing_set = self._find_event_set(db, resource, (source,dest))
         self.to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
+
+        self.internal_edges.append((source,label,dest))
+        self._reclassify_edges(db, resource, source,dest)
+
+        if dest not in self.graph_nodes:
+            self.graph_nodes.append(dest)
+            self._add_external_edges(db, resource, dest)
+
+        if source not in self.graph_nodes:
+            self.graph_nodes.append(source)
+            self._add_external_edges(db, resource, source)
 
         if not existing_set:
             # TODO: find everything from the left endpoint; find everything from the right endpoint
@@ -1176,14 +1298,24 @@ class NewProvenanceStore(ProvenanceStore):
         return self.real_index.get_provenance_data(db, resource, token)
 
     def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.real_index.flush(db)
         return self.real_index.get_connected_from(db, resource, token, label1)
 
     def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[pennprov.ProvTokenSetModel]
+        # type: (cursor, str, str, str) -> List[str]
         self.real_index.flush(db)
         return self.real_index.get_connected_to(db, resource, token, label1)
+
+    def get_connected_to_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple[str,str]]
+        self.real_index.flush(db)
+        return self.real_index.get_connected_from_label(db, resource, token, label1)
+
+    def get_connected_from_label(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple[str,str]]
+        self.real_index.flush(db)
+        return self.real_index.get_connected_to_label(db, resource, token, label1)
 
     def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
         self.real_index.flush(db)
