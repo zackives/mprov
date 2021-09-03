@@ -740,6 +740,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (cursor) -> None
         self._write_events(db)
         self._write_bindings(db)
+        self.nodeprop_pool.clear()
+        self.node_pool.clear()
+        self.edge_pool.clear()
         return
 
     def _add_node_event(self, db, resource, label, args, id=None):
