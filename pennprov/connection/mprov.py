@@ -176,7 +176,7 @@ class MProvConnection:
                 self.log.add_node(cursor, self.get_graph(), 'AGENT', agent_key)
 
                 key = self._get_qname('agent_name')
-                value = agent_name#self.user_token
+                value = self.user_token#agent_name#self.user_token
                 
                 self.log.add_nodeprop(cursor, self.get_graph(), agent_key, key, value,0)
 
@@ -785,7 +785,7 @@ class MProvConnection:
     def flush(self):
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
-                self.log.flush(cursor)
+                self.log.flush(cursor, self.graph_name)
             conn.commit()
         return
 

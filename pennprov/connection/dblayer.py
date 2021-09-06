@@ -75,7 +75,7 @@ class ProvenanceStore:
         # type: (cursor, str, str, str, Any, int) -> None
         return 1
 
-    def flush(self, db):
+    def flush(self, db, resource):
         return
 
     def reset(self):
@@ -296,7 +296,7 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_provenance_data(self, db, resource, token):
         # type: (cursor, str, str) -> List[Dict]
-        self.flush(db)
+        self.flush(db, resource)
         ret = []
         db.execute("SELECT index,code,value,ivalue,lvalue,fvalue,dvalue,tvalue,tsvalue,label FROM MProv_NodeProp WHERE _resource = (%s) AND _key = (%s)", (resource,token))
 
@@ -327,7 +327,7 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_connected_to(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             db.execute("SELECT _from FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s)", (resource,token))
         else:
@@ -337,7 +337,7 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_connected_from(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             db.execute("SELECT _to FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s)", (resource,token))
         else:
@@ -347,7 +347,7 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_connected_to_label(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             db.execute("SELECT _from,label FROM MProv_Edge WHERE _resource = (%s) AND _to = (%s)", (resource,token))
         else:
@@ -357,7 +357,7 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_connected_to(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             db.execute("SELECT _to,label FROM MProv_Edge WHERE _resource = (%s) AND _from = (%s)", (resource,token))
         else:
@@ -367,14 +367,14 @@ class SQLProvenanceStore(ProvenanceStore):
 
     def get_edges(self, db, resource):
         #type: (cursor, str) -> List[Tuple]
-        self.flush(db)
+        self.flush(db, resource)
         db.execute("SELECT _from,label,_to FROM MProv_Edge WHERE _resource = (%s)", (resource,))
 
         return [(x[0],x[1],x[2]) for x in db.fetchall()]
 
     def get_nodes(self, db, resource):
         #type: (cursor, str) -> List[Dict]
-        self.flush(db)
+        self.flush(db, resource)
         ret_list = []
 
         # Get the nodes first
@@ -424,8 +424,8 @@ class SQLProvenanceStore(ProvenanceStore):
         return ret_list
 
 
-    def flush(self, db):
-        # type: (cursor) -> None
+    def flush(self, db, resource):
+        # type: (cursor, str) -> None
         return
 
 
@@ -578,7 +578,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_provenance_data(self, db, resource, token):
         # type: (cursor, str, str) -> List[Dict]
-        self.flush(db)
+        self.flush(db, resource)
         ret = []
         db.execute("""SELECT b.index,b.code,b.svalue,b.ivalue,b.lvalue,b.fvalue,b.dvalue,b.tvalue,b.tsvalue,b.uvalue,e.label 
                       FROM MProv_Binding s 
@@ -617,7 +617,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def _get_connected(self, db, resource, token, inx, label1):
         # type: (cursor, str, str, int, str) -> List[pennprov.ProvTokenSetModel]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             # Need to start with the DEST, which is index 1
             db.execute("""SELECT b.index,b.svalue,e.label 
@@ -642,7 +642,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_connected_to(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             # Need to start with the DEST
             db.execute("""SELECT s.index,s.svalue,e.label 
@@ -663,7 +663,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_connected_from(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             # Need to start with the SOURCE
             db.execute("""SELECT s.index,s.svalue2,e.label 
@@ -685,7 +685,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_connected_to_label(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             # Need to start with the DEST
             db.execute("""SELECT s.index,s.svalue,e.label 
@@ -706,7 +706,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_connected_from_label(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        self.flush(db)
+        self.flush(db, resource)
         if label1 is None:
             # Need to start with the SOURCE
             db.execute("""SELECT s.index,s.svalue2,e.label 
@@ -748,7 +748,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_edges(self, db, resource):
         #type: (cursor, str) -> List[Tuple]
-        self.flush(db)
+        self.flush(db, resource)
         db.execute("""SELECT s.svalue,e.label,s.svalue2
                     FROM MProv_Binding s 
                         JOIN MProv_Event e ON s.event = e._key
@@ -759,7 +759,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def get_nodes(self, db, resource):
         #type: (cursor, str) -> List[Dict]
-        self.flush(db)
+        self.flush(db, resource)
         ret_list = []
         db.execute("""SELECT e.label,s.svalue,s.event
                       FROM MProv_Binding s 
@@ -807,8 +807,8 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         return ret_list
 
-    def flush(self, db):
-        # type: (cursor) -> None
+    def flush(self, db, resource):
+        # type: (cursor, str) -> None
         self._write_events(db)
         self._write_bindings(db)
         self.nodeprop_pool.clear()
@@ -859,8 +859,8 @@ class CachingSQLProvenanceStore(SQLProvenanceStore):
 
     total = 0
 
-    def flush(self, db):
-        # type: (cursor) -> None
+    def flush(self, db, resource):
+        # type: (cursor, str) -> None
         if len(self.node_pool) > 0:
             logging.debug('Flushing nodes...')
             self._write_nodes(db)
@@ -1028,7 +1028,7 @@ class CompressingProvenanceStore(ProvenanceStore):
     def _add_binding(self, log_id, binding_tuple):
         self.binding_history.append((log_id, binding_tuple))
 
-    def _add_log_event(self, log_tuple, binding_tuple,db):
+    def _add_log_event(self, log_tuple, binding_tuple,db,resource):
         self.op_history.append(log_tuple)
 
         found = False
@@ -1059,14 +1059,14 @@ class CompressingProvenanceStore(ProvenanceStore):
             logging.warning(str(self.op_history) + ' assigned to ' + str(last_node))
             self.chain['last'] = []
             # TODO: Log an entry from binding to
-            self.flush(db)
+            self.flush(db, resource)
         
         self._add_binding(last_node, binding_tuple)
         logging.debug(str(log_tuple) + ': ' + str(binding_tuple))
 
-    def flush(self, db):
-        # type: (cursor) -> None
-        self.real_index.flush(db)
+    def flush(self, db, resource):
+        # type: (cursor, str) -> None
+        self.real_index.flush(db, resource)
 
     def get_provenance_data(self, db, resource, token):
         # type: (cursor, str, str) -> List[Dict]
@@ -1121,14 +1121,12 @@ class NewProvenanceStore(ProvenanceStore):
     # EVENT SET to ID
     inverse_events = {}
 
-    # Given a node, what is the EVENT SET associated with it.
-    nodes_to_events = {}
-    # Which nodes match the EVENT SET
-    events_to_nodes = []
+    internal_edges = {}
+    external_edges = []
 
     graph_nodes = []
-    internal_edges = []
-    external_edges = []
+
+    dirty_nodes = set()
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
@@ -1150,6 +1148,7 @@ class NewProvenanceStore(ProvenanceStore):
     # TODO:  we start with a base event.  It has a UUID and we create an eventset + a binding
 
     def _extend_event_set(self, db, resource, tuple, existing_set):
+        # type: (str, str, Tuple[Any], str) -> str
         """
         Copy an event set node and add more items
         """
@@ -1177,21 +1176,21 @@ class NewProvenanceStore(ProvenanceStore):
             self.event_sets[uuid] = result
         else:
             # Reuse
-            return self.inverse_events[result]
+            return -self.inverse_events[result]
 
         return uuid
 
     def _extend_event_set_edge(self, db, resource, tuple, existing_set):
+        # type: (str, str, Tuple[Any], str) -> str
         """
         Copy an event set node and add more items
         """
 
-        result = set([tuple])
-
         if existing_set:
-            result = set.union(result, self.event_sets[existing_set])
-
-        result = frozenset(result)
+            result = set([tuple]).union(self.event_sets[existing_set])
+            result = frozenset(result)
+        else:
+            result = frozenset([tuple])
 
         #uuid = self.real_index._add_edge_event(db, resource, tuple[1], tuple[2])
 
@@ -1206,20 +1205,35 @@ class NewProvenanceStore(ProvenanceStore):
 
     def _find_event_set(self, db, resource, id):
         # type: (str, str, Tuple) -> Set[Any]
-        if id in self.nodes_to_events:
-            return self.nodes_to_events[id]
+        if id in self.to_events:
+            return self.to_events[id]
         else:
             return set()
 
     def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
 
-        existing_set = self._find_event_set(db, resource, (node_id,))
-        self.to_events[(node_id,)] = self._extend_event_set(db, resource, ('N',label),existing_set)
+        self._write_dirty_nodes(db, resource)
 
-        self.graph_nodes.append(node_id)
+        events = self._extend_event_set(db, resource, ('N',label),self._find_event_set(db, resource, (node_id,)))
+        if events < 0:
+            events = -events
+            self.dirty_nodes.add(node_id)
+
+        self.to_events[(node_id,)] = events
+
+        if node_id not in self.graph_nodes:
+            self.graph_nodes.append(node_id)
 
         return self.real_index.add_node(db, resource, label, node_id)
+
+    def _write_dirty_nodes(self, db, resource):
+        # type: (cursor, str, str) -> None
+        #for node in self.dirty_nodes:
+        #    self.real_index.add_node(db, resource, label, node_id)
+
+        self.dirty_nodes.clear()
+        
 
     def _add_external_edges(self, db, resource, node_id):
         # type: (cursor, str, str) -> None
@@ -1243,7 +1257,10 @@ class NewProvenanceStore(ProvenanceStore):
         for i in range(0, len(self.external_edges)):
             (src,label,dst) = self.external_edges[i]
             if src == source and dst == dest:
-                self.internal_edges.append(source,label,dest)
+                if source in self.internal_edges:
+                    self.internal_edges[source].append((label,dest))
+                else:
+                    self.internal_edges = [(label,dest)]
                 remov.add((src,label,dst))
 
         for edge in remov:
@@ -1257,8 +1274,13 @@ class NewProvenanceStore(ProvenanceStore):
         existing_set = self._find_event_set(db, resource, (source,dest))
         self.to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
 
-        self.internal_edges.append((source,label,dest))
-        self._reclassify_edges(db, resource, source,dest)
+        # Internal edges are adjacency list at the source
+        if source in self.graph_nodes and dest in self.graph_nodes:
+            if source in self.internal_edges:
+                self.internal_edges[source].append((label,dest))
+            else:
+                self.internal_edges[source] = [(label,dest)]
+        self._reclassify_edges(db, resource, source, dest)
 
         if dest not in self.graph_nodes:
             self.graph_nodes.append(dest)
@@ -1286,43 +1308,58 @@ class NewProvenanceStore(ProvenanceStore):
 
         return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
 
-    def flush(self, db):
+    def flush(self, db, resource):
+        self._write_dirty_nodes(db, resource)
         #logging.info(self.to_events)
         #logging.info(self.event_sets)
         # type: (cursor) -> None
-        self.real_index.flush(db)
+        if len(self.graph_nodes):
+            logging.debug("** Nodes: **")
+            for i in self.graph_nodes:
+                logging.debug('%s -> %s: %s'%(i, self.to_events[(i,)], self.event_sets[abs(self.to_events[(i,)])]))
+                
+            logging.debug("** Internal edges **")
+            for i in self.internal_edges:
+                logging.debug('From %s: %s'%(i,self.internal_edges[i]))
+
+        # logging.debug(self.inverse_events)
+
+        self.real_index.flush(db, resource)
+        self.graph_nodes.clear()
+        self.internal_edges.clear()
+        self.external_edges.clear()
 
     def get_provenance_data(self, db, resource, token):
         # type: (cursor, str, str) -> List[Dict]
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_provenance_data(db, resource, token)
 
     def get_connected_to(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_connected_from(db, resource, token, label1)
 
     def get_connected_from(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[str]
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_connected_to(db, resource, token, label1)
 
     def get_connected_to_label(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple[str,str]]
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_connected_from_label(db, resource, token, label1)
 
     def get_connected_from_label(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple[str,str]]
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_connected_to_label(db, resource, token, label1)
 
     def get_nodes(self, db: cursor, resource: str) -> List[Dict]:
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_nodes(db, resource)
 
     def get_edges(self, db: cursor, resource: str) -> List[Tuple]:
-        self.real_index.flush(db)
+        self.real_index.flush(db, resource)
         return self.real_index.get_edges(db, resource)
 
     def reset(self):
