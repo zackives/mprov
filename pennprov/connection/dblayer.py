@@ -1268,10 +1268,46 @@ class NewProvenanceStore(ProvenanceStore):
         
         return
 
-    def _get_graph_connected_to(self,node):
+    def _get_graph_connected(self,node):
         # TODO: transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
-        return set()
+        ret = set()
+        while True:
+            l = len(ret)
+            self._get_graph_connected_from(node, ret)
+            self._get_graph_connected_to(node, ret)
+            if len(ret) == l: 
+                break
+
+        logging.debug('---> %s is connected to %d nodes: %s'%(node,len(ret),ret))
+
+        return ret
+
+    def _get_graph_connected_from(self,node, ret):
+        # transitively assemble all nodes in our graph that are
+        # reachable via internal edges from node
+        if node in self.internal_edges:
+            for edge_list in self.internal_edges[node]:
+                for n in edge_list:
+                    node2 = n[1]
+                    if node2 not in ret:
+                        ret.add(node2)
+                        self._get_graph_connected_from(node2, ret)
+                        #self._get_graph_connected_to(node2, ret)
+
+        return ret
+
+    def _get_graph_connected_to(self,node, ret):
+        # transitively assemble all nodes in our graph that are
+        # reachable via internal edges from node
+        for node2,edge_list in self.internal_edges.items():
+            for n in edge_list:
+                if node2 not in ret and n[1] == node:
+                    ret.add(node2)
+                    #self._get_graph_connected_from(node2, ret)
+                    self._get_graph_connected_to(node2, ret)
+
+        return ret
 
     def _get_events(self,node_list):
         # TODO: find the event ID corresponding to the node_list
@@ -1283,20 +1319,28 @@ class NewProvenanceStore(ProvenanceStore):
         existing_set = self._find_event_set(db, resource, (source,dest))
         self.to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)
 
+        logging.debug('--> Adding new edge (%s,%s,%s)'%(source,label, dest))
+
         # Internal edges are adjacency list at the source
         if source in self.graph_nodes and dest in self.graph_nodes:
+            logging.debug('--> Endpoints in the current graph')
             if source in self.internal_edges:
                 self.internal_edges[source].append((label,dest))
             else:
                 self.internal_edges[source] = [(label,dest)]
+        else:
+            logging.debug('--> At least one endpoint is NOT in the current graph')
         self._reclassify_edges(db, resource, source, dest)
 
         # TODO: AND the source event ID, the dest event ID, the edge event ID
         # But how do we name it? By the entire graph node ID sublist
 
         if len(existing_set) == 0:
-            source_subgraph = list(self._get_graph_connected_to(source)).sort()
-            dest_subgraph = list(self._get_graph_connected_to(source)).sort()
+            source_subgraph = list(self._get_graph_connected(source))
+            source_subgraph.sort()
+            dest_subgraph = list(self._get_graph_connected(dest))
+            dest_subgraph.sort()
+            logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
             full_subgraph = (source_subgraph + dest_subgraph).sort()
 
             left = self._get_events(source_subgraph)
