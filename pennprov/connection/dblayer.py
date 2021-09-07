@@ -1268,6 +1268,15 @@ class NewProvenanceStore(ProvenanceStore):
         
         return
 
+    def _get_graph_connected_to(self,node):
+        # TODO: transitively assemble all nodes in our graph that are
+        # reachable via internal edges from node
+        return set()
+
+    def _get_events(self,node_list):
+        # TODO: find the event ID corresponding to the node_list
+        return self._get_id()
+
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
 
@@ -1281,6 +1290,21 @@ class NewProvenanceStore(ProvenanceStore):
             else:
                 self.internal_edges[source] = [(label,dest)]
         self._reclassify_edges(db, resource, source, dest)
+
+        # TODO: AND the source event ID, the dest event ID, the edge event ID
+        # But how do we name it? By the entire graph node ID sublist
+
+        if len(existing_set) == 0:
+            source_subgraph = list(self._get_graph_connected_to(source)).sort()
+            dest_subgraph = list(self._get_graph_connected_to(source)).sort()
+            full_subgraph = (source_subgraph + dest_subgraph).sort()
+
+            left = self._get_events(source_subgraph)
+            right = self._get_events(source_subgraph)
+
+            op = ('D',left,right)
+            # TODO: set this to our event
+
 
         if dest not in self.graph_nodes:
             self.graph_nodes.append(dest)
@@ -1317,10 +1341,14 @@ class NewProvenanceStore(ProvenanceStore):
             logging.debug("** Nodes: **")
             for i in self.graph_nodes:
                 logging.debug('%s -> %s: %s'%(i, self.to_events[(i,)], self.event_sets[abs(self.to_events[(i,)])]))
-                
+
             logging.debug("** Internal edges **")
             for i in self.internal_edges:
                 logging.debug('From %s: %s'%(i,self.internal_edges[i]))
+
+            logging.debug("** External edges **")
+            for i in self.external_edges:
+                logging.debug('From %s'%i)
 
         # logging.debug(self.inverse_events)
 
