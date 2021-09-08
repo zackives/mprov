@@ -448,7 +448,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
                                                             _resource VARCHAR(80) NOT NULL,
                                                             code CHAR(1),
                                                             label VARCHAR(80),
-                                                            args VARCHAR)
+                                                            args VARCHAR,
+                                                            child1 UUID,
+                                                            child2 UUID)
         """
 
         binding_table = """
@@ -742,7 +744,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def _write_events(self, db):
         # type: (cursor) -> None
         if len(self.event_queue) > 0:
-            execute_values(db,"INSERT INTO MProv_Event(_key,_resource,code,label,args) VALUES %s ON CONFLICT DO NOTHING", \
+            execute_values(db,"INSERT INTO MProv_Event(_key,_resource,code,label,args,child1,child2) VALUES %s ON CONFLICT DO NOTHING", \
                 self.event_queue)
 
         self.total += len(self.event_queue)
@@ -833,7 +835,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, UUID, UUID) -> UUID
         id = self._get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
 
-        self.event_queue.append((id, resource, 'C', str(event_1), str(event_2)))#args))
+        self.event_queue.append((id, resource, 'C', None, None, str(event_1), str(event_2)))#args))
         return id
 
     def add_node_event(self, db, resource, label, args, id=None):
@@ -841,21 +843,21 @@ class EventBindingProvenanceStore(ProvenanceStore):
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
 
-        self.event_queue.append((id, resource, 'N', label, None))#args))
+        self.event_queue.append((id, resource, 'N', label, None, None, None))#args))
         return id
 
     def add_edge_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
-        self.event_queue.append((id, resource, 'E', label, args))
+        self.event_queue.append((id, resource, 'E', label, None, None, None))
         return id
 
     def add_node_property_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
-        self.event_queue.append((id, resource, 'P', label, None))#args))
+        self.event_queue.append((id, resource, 'P', label, None, None, None))#args))
         return id
 
     def reset(self):
