@@ -1287,13 +1287,13 @@ class NewProvenanceStore(ProvenanceStore):
         # transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
         if node in self.internal_edges:
-            for edge_list in self.internal_edges[node]:
-                for n in edge_list:
-                    node2 = n[1]
-                    if node2 not in ret:
-                        ret.add(node2)
-                        self._get_graph_connected_from(node2, ret)
-                        #self._get_graph_connected_to(node2, ret)
+            for edge in self.internal_edges[node]:
+                node2 = edge[1]
+                # logging.debug('(Found_from %s -> %s)'%(node,node2))
+                if node2 not in ret:
+                    ret.add(node2)
+                    self._get_graph_connected_from(node2, ret)
+                    #self._get_graph_connected_to(node2, ret)
 
         return ret
 
@@ -1301,11 +1301,13 @@ class NewProvenanceStore(ProvenanceStore):
         # transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
         for node2,edge_list in self.internal_edges.items():
-            for n in edge_list:
-                if node2 not in ret and n[1] == node:
-                    ret.add(node2)
-                    #self._get_graph_connected_from(node2, ret)
-                    self._get_graph_connected_to(node2, ret)
+            if node2 not in ret:
+                for n in edge_list:
+                    if n[1] == node:
+                        ret.add(node2)
+                        # logging.debug('(Found_to %s -> %s)'%(node2,n[1]))
+                        #self._get_graph_connected_from(node2, ret)
+                        self._get_graph_connected_to(node2, ret)
 
         return ret
 
@@ -1321,6 +1323,9 @@ class NewProvenanceStore(ProvenanceStore):
 
         logging.debug('--> Adding new edge (%s,%s,%s)'%(source,label, dest))
 
+        # TODO: AND the source event ID, the dest event ID, the edge event ID
+        # But how do we name it? By the entire graph node ID sublist
+
         # Internal edges are adjacency list at the source
         if source in self.graph_nodes and dest in self.graph_nodes:
             logging.debug('--> Endpoints in the current graph')
@@ -1330,25 +1335,24 @@ class NewProvenanceStore(ProvenanceStore):
                 self.internal_edges[source] = [(label,dest)]
         else:
             logging.debug('--> At least one endpoint is NOT in the current graph')
+
+        # Bring in any extra
         self._reclassify_edges(db, resource, source, dest)
 
-        # TODO: AND the source event ID, the dest event ID, the edge event ID
-        # But how do we name it? By the entire graph node ID sublist
-
+        # This is a new connection
         if len(existing_set) == 0:
             source_subgraph = list(self._get_graph_connected(source))
             source_subgraph.sort()
             dest_subgraph = list(self._get_graph_connected(dest))
             dest_subgraph.sort()
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
-            full_subgraph = (source_subgraph + dest_subgraph).sort()
+            full_subgraph = list(set(source_subgraph).union(dest_subgraph)).sort()
 
             left = self._get_events(source_subgraph)
             right = self._get_events(source_subgraph)
 
             op = ('D',left,right)
             # TODO: set this to our event
-
 
         if dest not in self.graph_nodes:
             self.graph_nodes.append(dest)
@@ -1384,7 +1388,7 @@ class NewProvenanceStore(ProvenanceStore):
         if len(self.graph_nodes):
             logging.debug("** Nodes: **")
             for i in self.graph_nodes:
-                logging.debug('%s -> %s: %s'%(i, self.to_events[(i,)], self.event_sets[abs(self.to_events[(i,)])]))
+                logging.debug('%s -> %s: %s'%(i, abs(self.to_events[(i,)]), self.event_sets[abs(self.to_events[(i,)])]))
 
             logging.debug("** Internal edges **")
             for i in self.internal_edges:
