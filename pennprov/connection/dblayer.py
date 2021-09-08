@@ -1315,6 +1315,10 @@ class NewProvenanceStore(ProvenanceStore):
         # TODO: find the event ID corresponding to the node_list
         return self._get_id()
 
+    def _set_events(self, node_list, event_op):
+        # TODO: store this in the memo table
+        return
+
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
 
@@ -1352,6 +1356,7 @@ class NewProvenanceStore(ProvenanceStore):
             right = self._get_events(source_subgraph)
 
             op = ('D',left,right)
+            self._set_events(full_subgraph, op)
             # TODO: set this to our event
 
         if dest not in self.graph_nodes:
