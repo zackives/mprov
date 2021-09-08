@@ -488,14 +488,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         cursor.execute("DELETE FROM MProv_Event WHERE _resource = (%s)", (graph, ))
 
 
-    def _add_node_binding(self, id, label, resource, args):
+    def add_node_binding(self, id, label, resource, args):
         # type: (str, str, str, str, str) -> None
         ins_str = (id,resource,label,args)
         if ins_str not in self.node_pool:
             self.node_pool.add(ins_str)
             self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
 
-    def _add_edge_binding(self, id, resource, source, label, dest):
+    def add_edge_binding(self, id, resource, source, label, dest):
         # type: (str, str, str, str, str) -> None
         ins_str = (id,source,resource,label,dest)
         if ins_str not in self.edge_pool:
@@ -503,6 +503,19 @@ class EventBindingProvenanceStore(ProvenanceStore):
             self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,None,dest))
         return
 
+    def add_node_property_binding(self, resource, id, node, label,  value, ind):
+        # type: (str, str, str, str, str, Any) -> None
+
+        if isinstance(value, str):
+            return self._add_node_property_str_binding(resource, id, node, label, value, ind)
+        elif isinstance(value, int):
+            return self._add_node_property_int_binding(resource, id, node, label, value, ind)
+        elif isinstance(value, float):
+            return self._add_node_property_float_binding(resource, id, node, label, value, ind)
+        elif isinstance(value, datetime):
+            return self._add_node_property_datetime_binding(resource, id, node, label, value, ind)
+        else:
+            raise ValueError()
 
     def _add_node_property_str_binding(self, resource, id, node, label,  value, ind):
         # type: (str, str, str, str, str, int) -> None
@@ -551,13 +564,13 @@ class EventBindingProvenanceStore(ProvenanceStore):
         #logging.debug('Node: ' + label + '(' + skolem_args + ')')
 
         logging.debug('Adding node %s:%s' %(label,node_identifier))
-        id = self._add_node_event(db, resource, label, node_identifier)
-        self._add_node_binding(id, label, resource, node_identifier)
+        id = self.add_node_event(db, resource, label, node_identifier)
+        self.add_node_binding(id, label, resource, node_identifier)
         return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
-        id = self._add_node_property_event(db, resource, label, value)
+        id = self.add_node_property_event(db, resource, label, value)
         logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
             return self._add_node_property_str_binding(resource, id, node, label,  value, ind)
@@ -572,8 +585,8 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
-        id = self._add_edge_event(db, resource, label, dest)
-        self._add_edge_binding(id, resource, source, label, dest)
+        id = self.add_edge_event(db, resource, label, dest)
+        self.add_edge_binding(id, resource, source, label, dest)
         return 1
 
     def get_provenance_data(self, db, resource, token):
@@ -816,7 +829,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.edge_pool.clear()
         return
 
-    def _add_node_event(self, db, resource, label, args, id=None):
+    def add_compound_event(self, db, resource, event_1, event_2):
+        # type: (cursor, str, str, UUID, UUID) -> UUID
+        id = self._get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
+
+        self.event_queue.append((id, resource, 'C', str(event_1), str(event_2)))#args))
+        return id
+
+    def add_node_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
@@ -824,14 +844,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.event_queue.append((id, resource, 'N', label, None))#args))
         return id
 
-    def _add_edge_event(self, db, resource, label, args, id=None):
+    def add_edge_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
         self.event_queue.append((id, resource, 'E', label, args))
         return id
 
-    def _add_node_property_event(self, db, resource, label, args, id=None):
+    def add_node_property_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
@@ -1127,6 +1147,7 @@ class NewProvenanceStore(ProvenanceStore):
     graph_nodes = []
 
     dirty_nodes = set()
+    dirty_events = set()
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
@@ -1165,20 +1186,22 @@ class NewProvenanceStore(ProvenanceStore):
 
         # Are we adding a node event, or a node property event?
         if tuple[0] == 'N':
-            uuid = self.real_index._add_node_event(db, resource, tuple[1], '')
+            uuid = self.real_index.add_node_event(db, resource, tuple[1], '')
         else:
-            uuid = self.real_index._add_node_property_event(db, resource, tuple[1], tuple[2])
+            uuid = self.real_index.add_node_property_event(db, resource, tuple[1], tuple[2])
+
+        if existing_set:
+            uuid = self.real_index.add_compound_event(db, resource, self.event_sets[existing_set][0], uuid)
 
         if result not in self.inverse_events:
-            uuid = self._get_uuid()
+            nuuid = self._get_uuid()
 
-            self.inverse_events[result] = uuid
-            self.event_sets[uuid] = result
+            self.inverse_events[result] = nuuid
+            self.event_sets[nuuid] = [uuid]#result
+            return nuuid
         else:
             # Reuse
             return -self.inverse_events[result]
-
-        return uuid
 
     def _extend_event_set_edge(self, db, resource, tuple, existing_set):
         # type: (str, str, Tuple[Any], str) -> str
@@ -1204,7 +1227,7 @@ class NewProvenanceStore(ProvenanceStore):
 
 
     def _find_event_set(self, db, resource, id):
-        # type: (str, str, Tuple) -> Set[Any]
+        # type: (cursor, str, Tuple) -> Set[Any]
         if id in self.to_events:
             return self.to_events[id]
         else:
@@ -1213,9 +1236,16 @@ class NewProvenanceStore(ProvenanceStore):
     def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
 
+        """
+        Queue up an event to write a node. Wait for any node properties to be assigned.
+        Only write the node once we think the node properties are all assigned.
+        """
+
         self._write_dirty_nodes(db, resource)
 
-        events = self._extend_event_set(db, resource, ('N',label),self._find_event_set(db, resource, (node_id,)))
+        events = self._extend_event_set(db, resource, ('N',label),\
+            self._find_event_set(db, resource, (node_id,)))
+
         if events < 0:
             events = -events
             self.dirty_nodes.add(node_id)
@@ -1225,12 +1255,17 @@ class NewProvenanceStore(ProvenanceStore):
         if node_id not in self.graph_nodes:
             self.graph_nodes.append(node_id)
 
-        return self.real_index.add_node(db, resource, label, node_id)
+        #return self.real_index.add_node(db, resource, label, node_id)
+        return 0
 
     def _write_dirty_nodes(self, db, resource):
         # type: (cursor, str, str) -> None
-        #for node in self.dirty_nodes:
-        #    self.real_index.add_node(db, resource, label, node_id)
+        for node in self.dirty_nodes:
+            set_id = abs(self._find_event_set(db, resource, (node,)))
+            #self.event_set[set_id]
+            logging.debug("DIRTY %s"%self.event_sets[set_id])
+            #self.real_index.add_node(db, resource, label, node_id)
+            self.real_index.add_node_binding(self.event_sets[set_id][0],  'label', resource, node)
 
         self.dirty_nodes.clear()
         
@@ -1311,12 +1346,17 @@ class NewProvenanceStore(ProvenanceStore):
 
         return ret
 
-    def _get_events(self,node_list):
+    def _get_events(self, db, resource, node_list):
         # TODO: find the event ID corresponding to the node_list
+
+        if len(node_list) == 1:
+            return self._find_event_set(db, resource, (node_list[0],))
+
         return self._get_id()
 
-    def _set_events(self, node_list, event_op):
+    def _set_events(self, db, resource, node_list, event_op):
         # TODO: store this in the memo table
+
         return
 
     def add_edge(self, db, resource, source, label, dest):
@@ -1352,11 +1392,12 @@ class NewProvenanceStore(ProvenanceStore):
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
             full_subgraph = list(set(source_subgraph).union(dest_subgraph)).sort()
 
-            left = self._get_events(source_subgraph)
-            right = self._get_events(source_subgraph)
+            left = self._get_events(db, resource, source_subgraph)
+            right = self._get_events(db, resource, dest_subgraph)
 
             op = ('D',left,right)
-            self._set_events(full_subgraph, op)
+            self._set_events(db, resource, full_subgraph, op)
+            logging.debug('--> OP: %s'%str(op))
             # TODO: set this to our event
 
         if dest not in self.graph_nodes:
@@ -1383,7 +1424,7 @@ class NewProvenanceStore(ProvenanceStore):
         existing_set = self._find_event_set(db, resource, (node,))
         self.to_events[(node,)] = self._extend_event_set(db, resource, ('P',label,value),existing_set)
 
-        return self.real_index.add_nodeprop(db, resource, node, label, value, ind)
+        return 0#self.real_index.add_nodeprop(db, resource, node, label, value, ind)
 
     def flush(self, db, resource):
         self._write_dirty_nodes(db, resource)
