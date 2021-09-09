@@ -843,7 +843,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         db.execute("""SELECT *
                         FROM MProv_Event e
-                    WHERE e._resource = (%s) AND e.id=%s""", 
+                    WHERE e._resource = (%s) AND e._key=%s""", 
             (resource,id))
 
         ret = db.fetchall()
@@ -1202,17 +1202,19 @@ class NewProvenanceStore(ProvenanceStore):
         # type: (cursor, str) -> None
         self.real_index.clear_tables(db, graph)
 
-    # TODO:  we start with a base event.  It has a UUID and we create an eventset + a binding
-
     def _get_event_set_from_id(self, db, resource, result, id):
         #result = set.union(result, self.event_sets[id])
+        """
+        Given an eventset UUID, find all associated events.  May require transitive closure
+        if there are composite events.
+        """
 
         event = self.real_index.get_event(db, resource, id)
 
         # An event with children, find recursively
         if event[2] == 'C' or event[2] == 'D':
-            self._get_event_set_from_id(self, result, event[5])
-            self._get_event_set_from_id(self, result, event[6])
+            self._get_event_set_from_id(db, resource, result, event[5])
+            self._get_event_set_from_id(db, resource, result, event[6])
         else:
             result.add(event)
 
@@ -1221,7 +1223,7 @@ class NewProvenanceStore(ProvenanceStore):
     def _extend_event_set(self, db, resource, tuple, existing_set):
         # type: (str, str, Tuple[Any], str) -> str
         """
-        Copy an event set node and add more items
+        Copy an event set node and add more items. This is done via composite events.
         """
 
         # A singleton set with the event tuple
@@ -1230,7 +1232,7 @@ class NewProvenanceStore(ProvenanceStore):
         # Look up any items from the prior set (look up by its ID) and add
         # them to our set in the lattice
         if existing_set:
-            result = self._get_event_set_from_id(db, resource, result, self.event_sets[existing_set][0])
+            result = self._get_event_set_from_id(db, resource, result, self.event_sets[existing_set])
 
         result = frozenset(result)
 
@@ -1241,13 +1243,13 @@ class NewProvenanceStore(ProvenanceStore):
             uuid = self.real_index.add_node_property_event(db, resource, tuple[1], tuple[2])
 
         if existing_set:
-            uuid = self.real_index.add_compound_event(db, resource, self.event_sets[existing_set][0], uuid)
+            uuid = self.real_index.add_compound_event(db, resource, self.event_sets[existing_set], uuid)
 
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
 
             self.inverse_events[result] = nuuid
-            self.event_sets[nuuid] = [uuid]#result
+            self.event_sets[nuuid] = uuid#result
             return nuuid
         else:
             # Reuse
@@ -1313,9 +1315,11 @@ class NewProvenanceStore(ProvenanceStore):
         for node in self.dirty_nodes:
             set_id = abs(self._find_event_set(db, resource, (node,)))
             #self.event_set[set_id]
-            logging.debug("DIRTY %s"%self.event_sets[set_id])
+            result = set()
+            self._get_event_set_from_id(db, resource, result, self.event_sets[set_id])
+            logging.debug("DIRTY %s"%result)
             #self.real_index.add_node(db, resource, label, node_id)
-            self.real_index.add_node_binding(self.event_sets[set_id][0],  'label', resource, node)
+            self.real_index.add_node_binding(self.event_sets[set_id],  'label', resource, node)
 
         self.dirty_nodes.clear()
         
