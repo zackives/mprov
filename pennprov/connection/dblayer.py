@@ -1360,7 +1360,7 @@ class NewProvenanceStore(ProvenanceStore):
     def _get_graph_connected(self,node):
         # TODO: transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
-        ret = set()
+        ret = []#set()
         while True:
             l = len(ret)
             self._get_graph_connected_from(node, ret)
@@ -1380,7 +1380,7 @@ class NewProvenanceStore(ProvenanceStore):
                 node2 = edge[1]
                 # logging.debug('(Found_from %s -> %s)'%(node,node2))
                 if node2 not in ret:
-                    ret.add(node2)
+                    ret.append(node2)
                     self._get_graph_connected_from(node2, ret)
                     #self._get_graph_connected_to(node2, ret)
 
@@ -1392,8 +1392,8 @@ class NewProvenanceStore(ProvenanceStore):
         for node2,edge_list in self.internal_edges.items():
             if node2 not in ret:
                 for n in edge_list:
-                    if n[1] == node:
-                        ret.add(node2)
+                    if n[1] == node and node2 not in ret:
+                        ret.append(node2)
                         # logging.debug('(Found_to %s -> %s)'%(node2,n[1]))
                         #self._get_graph_connected_from(node2, ret)
                         self._get_graph_connected_to(node2, ret)
