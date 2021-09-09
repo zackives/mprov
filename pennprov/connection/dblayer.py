@@ -1439,12 +1439,12 @@ class NewProvenanceStore(ProvenanceStore):
 
         # This is a new connection
         if len(existing_set) == 0:
-            source_subgraph = list(self._get_graph_connected(source))
-            source_subgraph.sort()
-            dest_subgraph = list(self._get_graph_connected(dest))
-            dest_subgraph.sort()
+            source_subgraph = (self._get_graph_connected(source))
+            #source_subgraph.sort()
+            dest_subgraph = (self._get_graph_connected(dest))
+            #dest_subgraph.sort()
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
-            full_subgraph = list(set(source_subgraph).union(dest_subgraph)).sort()
+            full_subgraph = (source_subgraph) + (dest_subgraph)
 
             left = self._get_events(db, resource, source_subgraph)
             right = self._get_events(db, resource, dest_subgraph)
