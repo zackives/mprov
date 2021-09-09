@@ -846,6 +846,24 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.event_queue.append((id, resource, 'N', label, None, None, None))#args))
         return id
 
+    def get_event(self, db, resource, id):
+        # type: (cursor, str, UUID) -> Tuple[Any]
+        for tuple in self.event_queue:
+            if tuple[0] == id:
+                return tuple
+
+        db.execute("""SELECT *
+                        FROM MProv_Event e
+                    WHERE e._resource = (%s) AND e.id=%s""", 
+            (resource,id))
+
+        ret = db.fetchall()
+        if len(ret):
+            return ret[0]
+        else:
+            return None
+        
+
     def add_edge_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
         if id == None:
@@ -1170,6 +1188,20 @@ class NewProvenanceStore(ProvenanceStore):
 
     # TODO:  we start with a base event.  It has a UUID and we create an eventset + a binding
 
+    def _get_event_set_from_id(self, db, resource, result, id):
+        #result = set.union(result, self.event_sets[id])
+
+        event = self.real_index.get_event(db, resource, id)
+
+        # An event with children, find recursively
+        if event[2] == 'C' or event[2] == 'D':
+            self._get_event_set_from_id(self, result, event[5])
+            self._get_event_set_from_id(self, result, event[6])
+        else:
+            result.add(event)
+
+        return result
+    
     def _extend_event_set(self, db, resource, tuple, existing_set):
         # type: (str, str, Tuple[Any], str) -> str
         """
@@ -1182,7 +1214,7 @@ class NewProvenanceStore(ProvenanceStore):
         # Look up any items from the prior set (look up by its ID) and add
         # them to our set in the lattice
         if existing_set:
-            result = set.union(result, self.event_sets[existing_set])
+            result = self._get_event_set_from_id(db, resource, result, self.event_sets[existing_set][0])
 
         result = frozenset(result)
 
