@@ -831,23 +831,12 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.edge_pool.clear()
         return
 
-    def add_compound_event(self, db, resource, event_1, event_2):
-        # type: (cursor, str, str, UUID, UUID) -> UUID
-        id = self._get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
-
-        self.event_queue.append((id, resource, 'C', None, None, str(event_1), str(event_2)))#args))
-        return id
-
-    def add_node_event(self, db, resource, label, args, id=None):
-        # type: (cursor, str, str, str, UUID) -> UUID
-        if id == None:
-            id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
-
-        self.event_queue.append((id, resource, 'N', label, None, None, None))#args))
-        return id
-
     def get_event(self, db, resource, id):
         # type: (cursor, str, UUID) -> Tuple[Any]
+        """
+        Retrieves an event tuple, either from the event queue or the persistent DB.
+        The event may be atomic ('N', 'E', 'P') or composite ('C','D').
+        """
         for tuple in self.event_queue:
             if tuple[0] == id:
                 return tuple
@@ -864,8 +853,32 @@ class EventBindingProvenanceStore(ProvenanceStore):
             return None
         
 
+    def add_compound_event(self, db, resource, event_1, event_2):
+        # type: (cursor, str, str, UUID, UUID) -> UUID
+        """
+        Adds a "compound" event with two child events
+        """
+        id = self._get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
+
+        self.event_queue.append((id, resource, 'C', None, None, str(event_1), str(event_2)))#args))
+        return id
+
+    def add_node_event(self, db, resource, label, args, id=None):
+        # type: (cursor, str, str, str, UUID) -> UUID
+        """
+        Adds an event corresponding to a node
+        """
+        if id == None:
+            id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
+
+        self.event_queue.append((id, resource, 'N', label, None, None, None))#args))
+        return id
+
     def add_edge_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
+        """
+        Adds an event corresponding to an edge
+        """
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
         self.event_queue.append((id, resource, 'E', label, None, None, None))
@@ -873,6 +886,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     def add_node_property_event(self, db, resource, label, args, id=None):
         # type: (cursor, str, str, str, UUID) -> UUID
+        """
+        Adds an event corresponding to a node property
+        """
         if id == None:
             id = self._get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
         self.event_queue.append((id, resource, 'P', label, None, None, None))#args))
