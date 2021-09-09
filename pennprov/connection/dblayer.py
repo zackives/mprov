@@ -1400,7 +1400,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         return ret
 
-    def _get_events(self, db, resource, node_list):
+    def _get_event_expression_id(self, db, resource, node_list):
         # TODO: find the event ID corresponding to the node_list
 
         if len(node_list) == 1:
@@ -1439,15 +1439,13 @@ class NewProvenanceStore(ProvenanceStore):
 
         # This is a new connection
         if len(existing_set) == 0:
-            source_subgraph = (self._get_graph_connected(source))
-            #source_subgraph.sort()
-            dest_subgraph = (self._get_graph_connected(dest))
-            #dest_subgraph.sort()
+            source_subgraph = self._get_graph_connected(source)
+            dest_subgraph = self._get_graph_connected(dest)
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
-            full_subgraph = (source_subgraph) + (dest_subgraph)
+            full_subgraph = source_subgraph + dest_subgraph
 
-            left = self._get_events(db, resource, source_subgraph)
-            right = self._get_events(db, resource, dest_subgraph)
+            left = self._get_event_expression_id(db, resource, source_subgraph)
+            right = self._get_event_expression_id(db, resource, dest_subgraph)
 
             op = ('D',left,right)
             self._set_events(db, resource, full_subgraph, op)
