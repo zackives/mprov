@@ -1293,8 +1293,6 @@ class NewProvenanceStore(ProvenanceStore):
         Only write the node once we think the node properties are all assigned.
         """
 
-        self._write_dirty_nodes(db, resource)
-
         events = self._extend_event_set(db, resource, ('N',label),\
             self._find_event_set(db, resource, (node_id,)))
 
@@ -1403,10 +1401,10 @@ class NewProvenanceStore(ProvenanceStore):
     def _get_event_expression_id(self, db, resource, node_list):
         # TODO: find the event ID corresponding to the node_list
 
-        if len(node_list) == 1:
+        if len(node_list) >= 1:
             return self._find_event_set(db, resource, (node_list[0],))
 
-        return self._get_id()
+        return None#self._get_id()
 
     def _set_events(self, db, resource, node_list, event_op):
         # TODO: store this in the memo table
@@ -1444,8 +1442,8 @@ class NewProvenanceStore(ProvenanceStore):
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
             full_subgraph = source_subgraph + dest_subgraph
 
-            left = self._get_event_expression_id(db, resource, source_subgraph)
-            right = self._get_event_expression_id(db, resource, dest_subgraph)
+            left = self.event_sets[abs(self._get_event_expression_id(db, resource, source_subgraph))]
+            right = self.event_sets[abs(self._get_event_expression_id(db, resource, dest_subgraph))]
 
             op = ('D',left,right)
             self._set_events(db, resource, full_subgraph, op)
@@ -1486,7 +1484,7 @@ class NewProvenanceStore(ProvenanceStore):
         if len(self.graph_nodes):
             logging.debug("** Nodes: **")
             for i in self.graph_nodes:
-                logging.debug('%s -> %s: %s'%(i, abs(self.to_events[(i,)]), self.event_sets[abs(self.to_events[(i,)])]))
+                logging.debug('%s -> %s'%(i, self.event_sets[abs(self.to_events[(i,)])]))
 
             logging.debug("** Internal edges **")
             for i in self.internal_edges:
