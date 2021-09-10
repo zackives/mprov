@@ -433,8 +433,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
     Factory.register_index_type('event-binding', lambda: EventBindingProvenanceStore())
 
-    MAX_ELEMENTS = 16384
-
     event_queue = []
     binding_queue = []
     total = 0
@@ -481,11 +479,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
                         WHERE svalue2 IS NOT NULL
         """
 
-        prop_constraint = """
-                    CREATE UNIQUE INDEX IF NOT EXISTS prop_constraint ON MProv_Binding (uvalue, index, svalue, ivalue, lvalue, dvalue, fvalue, tvalue, tsvalue)
-                        WHERE uvalue IS NOT NULL
-        """
-
         schema_table = """
                      CREATE UNLOGGED TABLE IF NOT EXISTS MProv_Schema(_key VARCHAR(80) NOT NULL,
                                                            _resource VARCHAR(80) NOT NULL,
@@ -500,7 +493,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         cursor.execute(binding_table)
         cursor.execute(node_constraint)
         cursor.execute(edge_constraint)
-        cursor.execute(prop_constraint)
         cursor.execute(schema_table)
         psycopg2.extras.register_uuid()
 
@@ -588,8 +580,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         logging.debug('Adding node %s:%s' %(label,node_identifier))
         id = self.add_node_event(db, resource, label, node_identifier)
         self.add_node_binding(id, label, resource, node_identifier)
-        if len(self.binding_queue) > self.MAX_ELEMENTS:
-            self._write_bindings(db)
         return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
@@ -612,8 +602,6 @@ class EventBindingProvenanceStore(ProvenanceStore):
         # type: (cursor, str, str, str, str) -> int
         id = self.add_edge_event(db, resource, label, dest)
         self.add_edge_binding(id, resource, source, label, dest)
-        if len(self.binding_queue) > self.MAX_ELEMENTS:
-            self._write_bindings(db)
         return 1
 
     def get_provenance_data(self, db, resource, token):
