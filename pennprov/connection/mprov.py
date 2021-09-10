@@ -233,12 +233,11 @@ class MProvConnection:
         if isinstance(tuple, BasicTuple):
             for i, k in enumerate(tuple.schema.fields):
                 v = tuple[k]
-                self.log.add_nodeprop(cursor,resource,node,k,v)
-                i = i + 1
+                self.log.add_nodeprop(cursor,resource,node,k,v, i)
         else:
             i = 0
             for k,v in tuple.items():
-                self.log.add_nodeprop(cursor,self.get_graph(),node,k,v)
+                self.log.add_nodeprop(cursor,self.get_graph(),node,k,v, i)
                 i = i + 1
 
     def store_stream_tuple(self, stream_name, stream_index, input_tuple):
