@@ -1315,7 +1315,7 @@ class NewProvenanceStore(ProvenanceStore):
             #self.event_set[set_id]
             result = set()
             self._get_event_set_from_id(db, resource, result, self.event_sets[set_id])
-            logging.debug("DIRTY %s"%result)
+            #logging.debug("Persisting %s"%result)
             #self.real_index.add_node(db, resource, label, node_id)
             self.real_index.add_node_binding(self.event_sets[set_id],  'label', resource, node)
 
@@ -1424,13 +1424,13 @@ class NewProvenanceStore(ProvenanceStore):
 
         # Internal edges are adjacency list at the source
         if source in self.graph_nodes and dest in self.graph_nodes:
-            logging.debug('--> Endpoints in the current graph')
+            #logging.debug('--> Endpoints in the current graph')
             if source in self.internal_edges:
                 self.internal_edges[source].append((label,dest))
             else:
                 self.internal_edges[source] = [(label,dest)]
-        else:
-            logging.debug('--> At least one endpoint is NOT in the current graph')
+        #else:
+        #    logging.debug('--> At least one endpoint is NOT in the current graph')
 
         # Bring in any extra
         self._reclassify_edges(db, resource, source, dest)
@@ -1484,15 +1484,15 @@ class NewProvenanceStore(ProvenanceStore):
         if len(self.graph_nodes):
             logging.debug("** Nodes: **")
             for i in self.graph_nodes:
-                logging.debug('%s -> %s'%(i, self.event_sets[abs(self.to_events[(i,)])]))
+                logging.debug(' %s -> %s'%(i, self.event_sets[abs(self.to_events[(i,)])]))
 
             logging.debug("** Internal edges **")
             for i in self.internal_edges:
-                logging.debug('From %s: %s'%(i,self.internal_edges[i]))
+                logging.debug(' From %s: %s'%(i,self.internal_edges[i]))
 
             logging.debug("** External edges **")
             for i in self.external_edges:
-                logging.debug('From %s'%i)
+                logging.debug(' From %s'%i)
 
         # logging.debug(self.inverse_events)
 
