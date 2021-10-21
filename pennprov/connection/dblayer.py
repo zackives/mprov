@@ -1488,16 +1488,20 @@ class NewProvenanceStore(ProvenanceStore):
 
             # This is our graph
             full_subgraph = source_subgraph + dest_subgraph
+        else:
+            full_subgraph = self._get_graph_connected(source)
+            source_subgraph = full_subgraph
+            dest_subgraph = []
 
         # Internal edges are adjacency list at the source
-        if source in self.graph_nodes and dest in self.graph_nodes:
-            #logging.debug('--> Endpoints in the current graph')
-            if source in self.internal_edges:
-                self.internal_edges[source].append((label,dest))
-            else:
-                self.internal_edges[source] = [(label,dest)]
-        else:
-            logging.debug('--> At least one endpoint is NOT in the current graph')
+        # if source in self.graph_nodes and dest in self.graph_nodes:
+        #     #logging.debug('--> Endpoints in the current graph')
+        #     if source in self.internal_edges:
+        #         self.internal_edges[source].append((label,dest))
+        #     else:
+        #         self.internal_edges[source] = [(label,dest)]
+        # else:
+        #     logging.debug('--> At least one endpoint is NOT in the current graph')
         
         new_edge = self.real_index.add_edge_uuid(db, resource, source, label, dest)
 
@@ -1511,15 +1515,23 @@ class NewProvenanceStore(ProvenanceStore):
             self.graph_nodes.append(source)
             self._add_external_edges(db, resource, source)
 
+        if source in self.internal_edges:
+            self.internal_edges[source].append((label,dest))
+        else:
+            self.internal_edges[source] = [(label,dest)]
+
         if existing_set == None:#len(existing_set) == 0:
             # These are the events for left
             left = self.event_sets[self._get_event_expression_id(db, resource, source_subgraph)]
             # These are the events for right
             right = self.event_sets[self._get_event_expression_id(db, resource, dest_subgraph)]
 
-            # Composite event -- need to save it to our state
-            # TODO: add the edge!
             self._merge_subgraph_events(db, resource, full_subgraph, ('D',left,right,new_edge))
+        else:
+            # These are the events for left
+            existing_graph = self.event_sets[self._get_event_expression_id(db, resource, source_subgraph)]
+
+            self._merge_subgraph_events(db, resource, full_subgraph, ('D',existing_graph,None,new_edge))
 
         return new_edge
 
