@@ -1377,7 +1377,7 @@ class NewProvenanceStore(ProvenanceStore):
             if len(ret) == l: 
                 break
 
-        #logging.debug('---> %s is connected to %d nodes: %s'%(node,len(ret),ret))
+        logging.debug('---> %s is connected to %d nodes: %s'%(node,len(ret),ret))
         # logging.debug('---> Subgraph (%s)'%ret)
 
         return ret
@@ -1417,6 +1417,7 @@ class NewProvenanceStore(ProvenanceStore):
         # TODO: find the event ID corresponding to the node_list
 
         if len(node_list) >= 1:
+            logging.debug("Looking up %s"%str(tuple(node_list)))
             return self._find_event_set(db, resource, tuple(node_list))
 
         return None#self._get_id()
@@ -1516,8 +1517,10 @@ class NewProvenanceStore(ProvenanceStore):
             self._add_external_edges(db, resource, source)
 
         if source in self.internal_edges:
+            logging.debug("--> Adding internal edge %s"%str((label,dest,)))
             self.internal_edges[source].append((label,dest))
         else:
+            logging.debug("--> Setting  internal edge %s -> %s"%(source,str((label,dest,))))
             self.internal_edges[source] = [(label,dest)]
 
         if existing_set == None:#len(existing_set) == 0:
