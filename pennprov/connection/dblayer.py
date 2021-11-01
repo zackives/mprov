@@ -17,8 +17,12 @@ from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 import logging
 import os
 
+from collections import OrderedDict
+
 import pennprov
 from pennprov.config import config
+from pennprov.models.subgraph import Subgraph
+from pennprov.models.composite_events import EventManager
 
 import datetime
 
@@ -747,6 +751,22 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         return [(x[1],x[2]) for x in db.fetchall()]
 
+    def _get_events(self, id):
+        # type: (UUID) -> Tuple[Any]
+        for row in self.event_queue:
+            if row[1] == id:
+                return row
+
+        return None
+
+    def _get_bindings(self, id):
+        # type: (UUID) -> Tuple[Any]
+        for row in self.binding_queue:
+            if row[0] == id:
+                return row
+
+        return None
+
     def _write_events(self, db):
         # type: (cursor) -> None
         if len(self.event_queue) > 0:
@@ -1164,41 +1184,31 @@ class NewProvenanceStore(ProvenanceStore):
     #   add_node(tok), add_edge(tok1,lab,tok2), add_prop(tok1,tok2,tok3), repeat(index), 2(index1,index2)
     #   f(p_index,index), s(start_p_index,stop_p_index,index)
 
-    # Unique UUID space for this thread / context
-    uuid = None
-    binding = 0
-
     real_index = None
 
-    event_sets = {}         # type: Mapping[UUID, Set(Tuple)]
-    inverse_events = {}     # type: Mapping[Set(Tuple), UUID]
-
-    # Every node was created according to some event ID (which might also lead to many other things)
-    to_events = {}
-    from_events = []
+    event_sets = None   # type: EventManager
 
     Factory.register_index_type('new', lambda: NewProvenanceStore(EventBindingProvenanceStore()))
-    # ID to EVENT SET
-    event_sets = {}
-    # EVENT SET to ID
-    inverse_events = {}
 
-    internal_edges = {}
-    external_edges = []
+    # internal_edges = {}
+    # external_edges = []
 
     graph_nodes = []
 
-    dirty_nodes = set()
-    dirty_events = set()
+    active_subgraphs = OrderedDict()        # type: Mapping[Tuple[Any],Subgraph]
+
+    #dirty_nodes = set()                     # type: Set[UUID]
+    #dirty_events = set()                    # type: Set[UUID]
 
     def __init__(self, r_index):
         # type: (EventBindingProvenanceStore) -> None
         self.real_index = r_index
-        self.uuid = uuid.uuid4().int
+        self.event_sets = EventManager(r_index)
 
-    def _get_uuid(self):
-        self.uuid = self.uuid + 1
-        return self.uuid -1
+    # def _get_uuid(self):
+    #     # type: () -> UUID
+    #     self.uuid = self.uuid + 1
+    #     return self.uuid -1
 
     def create_tables(self, db):
         # type: (cursor) -> None
@@ -1208,219 +1218,28 @@ class NewProvenanceStore(ProvenanceStore):
         # type: (cursor, str) -> None
         self.real_index.clear_tables(db, graph)
 
-    def _get_event_set_from_id(self, db, resource, result, id):
-        #result = set.union(result, self.event_sets[id])
-        """
-        Given an eventset UUID, find all associated events.  May require transitive closure
-        if there are composite events.  The "C" and "D" composite events reference child events,
-        leading to the recursive case.
-        """
-
-        event = self.real_index.get_event(db, resource, id)
-
-        # An event with children, find recursively
-        if event[2] == 'C' or event[2] == 'D':
-            self._get_event_set_from_id(db, resource, result, event[5])
-            self._get_event_set_from_id(db, resource, result, event[6])
-        else:
-            result.add(event)
-
-        return result
-    
-    def _extend_event_set(self, db, resource, tuple, existing_set):
-        # type: (str, str, Tuple[Any], str) -> Tuple[str,bool]
-        """
-        Copy an event set node and add more items. This is done via composite events.
-        """
-
-        # A singleton set with the event tuple
-        result = set([tuple])
-
-        # Look up any items from the prior set (look up by its ID) and add
-        # them to our set in the lattice
-        if existing_set:
-            result = self._get_event_set_from_id(db, resource, result, self.event_sets[existing_set])
-
-        result = frozenset(result)
-
-        # Are we adding a node event, or a node property event?
-        if tuple[0] == 'N':
-            uuid = self.real_index.add_node_event(db, resource, tuple[1], '')
-        else:
-            uuid = self.real_index.add_node_property_event(db, resource, tuple[1], tuple[2])
-
-        if existing_set:
-            uuid = self.real_index.add_compound_event(db, resource, self.event_sets[existing_set], uuid)
-
-        if result not in self.inverse_events:
-            nuuid = self._get_uuid()
-
-            self.inverse_events[result] = nuuid
-            self.event_sets[nuuid] = uuid#result
-            return (nuuid,True)
-        else:
-            # Reuse
-            return (self.inverse_events[result],False)
-
-    def _extend_event_set_edge(self, db, resource, tuple, existing_set):
-        # type: (str, str, Tuple[Any], str) -> Tuple[str,bool]
-        """
-        Copy an event set node and add more items
-        """
-
-        if existing_set:
-            result = set([tuple]).union(self.event_sets[existing_set])
-            result = frozenset(result)
-        else:
-            result = frozenset([tuple])
-
-        #uuid = self.real_index._add_edge_event(db, resource, tuple[1], tuple[2])
-
-        if result not in self.inverse_events:
-            uuid = self._get_id()
-            self.inverse_events[result] = uuid
-            self.event_sets[uuid] = result
-            return (uuid,True)
-        else:
-            return (self.inverse_events[result],True)
-
-
-    def _find_event_set(self, db, resource, id):
-        # type: (cursor, str, Tuple) -> Set[Any]
-        if id in self.to_events:
-            return self.to_events[id]
-        else:
-            return None
-
-    def add_node(self, db, resource, label, node_id):
-        # type: (cursor, str, str, str) -> int
-
-        """
-        Queue up an event to write a node. Wait for any node properties to be assigned.
-        Only write the node once we think the node properties are all assigned.
-        """
-
-        events = self._extend_event_set(db, resource, ('N',label),\
-            self._find_event_set(db, resource, (node_id,)))
-
-        if not events[1]:
-            self.dirty_nodes.add(node_id)
-
-        self.to_events[(node_id,)] = events[0]
-
-        if node_id not in self.graph_nodes:
-            self.graph_nodes.append(node_id)
-
-        #return self.real_index.add_node(db, resource, label, node_id)
-        return 0
-
     def _write_dirty_nodes(self, db, resource):
         # type: (cursor, str, str) -> None
         """
         Clear the write cache, writing any nodes to the DBMS
         """
-        for node in self.dirty_nodes:
-            set_id = self._find_event_set(db, resource, (node,))
-            #self.event_set[set_id]
-            result = set()
-            self._get_event_set_from_id(db, resource, result, self.event_sets[set_id])
-            #logging.debug("Persisting %s"%result)
-            #self.real_index.add_node(db, resource, label, node_id)
-            self.real_index.add_node_binding(self.event_sets[set_id],  'label', resource, node)
+        logging.info("Flushing cache")
 
-        self.dirty_nodes.clear()
+        # TODO: make it an LRU cache
+
+        for graph in self.active_subgraphs.values():
+            graph.write_self(db, resource)
+        # for node in self.dirty_nodes:
+        #     set_id = self.event_sets.find_event_set(db, resource, (node,))
+        #     #self.event_set[set_id]
+        #     result = set()
+        #     self.event_sets.get_event_set_from_id(db, resource, result, self.event_sets[set_id])
+        #     #logging.debug("Persisting %s"%result)
+        #     #self.real_index.add_node(db, resource, label, node_id)
+        #     self.real_index.add_node_binding(self.event_sets[set_id],  'label', resource, node)
+
+        # self.dirty_nodes.clear()
         
-
-    def _add_external_edges(self, db, resource, node_id):
-        # type: (cursor, str, str) -> None
-        """
-        Given a new frontier node, find any adjacent edges and add them
-        to our external-facing set
-        """
-        for (src,label) in self.get_connected_from_label(db, resource, node_id, None):
-            self.external_edges.append((src,label,node_id))
-
-        for (dest,label) in self.get_connected_to_label(db, resource, node_id, None):
-            self.external_edges.append((node_id,label,dest))
-        return
-
-    def _reclassify_edges(self, db, resource, source, dest):
-        # type: (cursor, str, str, str) -> None
-        """
-        Ensure that any edges that were previously external-facing
-        are now internal edges
-        """
-        remove_these = set()
-        for i in range(0, len(self.external_edges)):
-            (src,label,dst) = self.external_edges[i]
-            if src == source and dst == dest:
-                if source in self.internal_edges:
-                    self.internal_edges[source].append((label,dest))
-                else:
-                    self.internal_edges = [(label,dest)]
-                remove_these.add((src,label,dst))
-
-        for edge in remove_these:
-            self.external_edges.remove(remove_these)
-        
-        return
-
-    def _get_graph_connected(self,node):
-        # type: (str) -> List[str]
-        # TODO: transitively assemble all nodes in our graph that are
-        # reachable via internal edges from node
-        ret = [node]#set()
-        while True:
-            l = len(ret)
-            self._get_graph_connected_from(node, ret)
-            self._get_graph_connected_to(node, ret)
-            if len(ret) == l: 
-                break
-
-        logging.debug('---> %s is connected to %d nodes: %s'%(node,len(ret),ret))
-        # logging.debug('---> Subgraph (%s)'%ret)
-
-        return ret
-
-    def _get_graph_connected_from(self,node, ret):
-        # type: (str, List[str]) -> None
-        # transitively assemble all nodes in our graph that are
-        # reachable via internal edges from node
-        if node in self.internal_edges:
-            for edge in self.internal_edges[node]:
-                node2 = edge[1]
-                # logging.debug('(Found_from %s -> %s)'%(node,node2))
-                if node2 not in ret:
-                    ret.append(node2)
-                    self._get_graph_connected_from(node2, ret)
-                    #self._get_graph_connected_to(node2, ret)
-
-        return ret
-
-    def _get_graph_connected_to(self,node, ret):
-        # type: (str, List[str]) -> None
-        # transitively assemble all nodes in our graph that are
-        # reachable via internal edges from node
-        for node2,edge_list in self.internal_edges.items():
-            if node2 not in ret:
-                for n in edge_list:
-                    if n[1] == node and node2 not in ret:
-                        ret.append(node2)
-                        # logging.debug('(Found_to %s -> %s)'%(node2,n[1]))
-                        #self._get_graph_connected_from(node2, ret)
-                        self._get_graph_connected_to(node2, ret)
-
-        return ret
-
-    def _get_event_expression_id(self, db, resource, node_list):
-        # type: (cursor, str, List[str]) -> str
-        # TODO: find the event ID corresponding to the node_list
-
-        if len(node_list) >= 1:
-            logging.debug("Looking up %s"%str(tuple(node_list)))
-            return self._find_event_set(db, resource, tuple(node_list))
-
-        return None#self._get_id()
 
     #######################################################
     ### This is where we need to focus our development. ###
@@ -1430,22 +1249,43 @@ class NewProvenanceStore(ProvenanceStore):
     #     (2) how do we effectively merge subgraphs while separating
     #         bindings, and passing recursively to subgraphs?
 
-    def _merge_subgraph_events(self, db, resource, node_list, event_op):
-        # TODO: store this in the memo table
-        logging.debug('--> New composite event to connect subgraphs: %s'%str(event_op))
-        event_1 = event_op[1]
-        event_2 = event_op[2]
-        edge = event_op[3]
-        id = self._get_id_from_key(resource + ':' + str(event_1) + '.' + str(edge) + '.' + str(event_2) + "\\D")# + str(args))
+    def add_node(self, db, resource, label, node_id):
+        # type: (cursor, str, str, str) -> int
 
-        self.real_index.event_queue.append((id, resource, event_op[0], edge, None, str(event_1), str(event_2)))#args))
+        """
+        Queue up an event to write a node. Wait for any node properties to be assigned.
+        Only write the node once we think the node properties are all assigned.
+        """
 
-        self.to_events[tuple(node_list)] = id
+        events = self.event_sets.extend_event_set_from_base(db, resource, ('N',label), (node_id,))
+        self.event_sets.associate_event((node_id,), events[0])
 
-        # TODO: remove
-        self.flush(db, resource)
+        #if not events[1]:
+            # self.dirty_nodes.add(node_id)
+        #   self.active_subgraphs[(node_id,)] = Subgraph(set(node_id), self.event_sets, events[0])
 
-        return
+        # TODO: probably don't need
+        if node_id not in self.graph_nodes:
+            self.graph_nodes.append(node_id)
+            self.active_subgraphs[(node_id,)] = Subgraph(set(node_id), self.event_sets, events[0])
+        return 0
+
+    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, Any, int) -> int
+        """
+        Associate a property with a node
+        """
+
+        existing_set = self.event_sets.find_event_set(db, resource, (node,))
+        #self.graph_to_events[(node,)]
+
+        # Update the node ID's subgraph to include the property events
+        self.active_subgraphs[(node,)] = self.active_subgraphs[(node,)].add_event(self.event_sets.extend_event_set(db, resource, ('P',label,value),existing_set)[0])
+        
+        # = self.event_sets.extend_event_set(db, resource, ('P',label,value),existing_set)[0]
+
+        return 0#self.real_index.add_nodeprop(db, resource, node, label, value, ind)
+
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> int
@@ -1455,9 +1295,17 @@ class NewProvenanceStore(ProvenanceStore):
         """
 
         # First, see if there are already edges between the source + dest
-        existing_set = self._find_event_set(db, resource, (source,dest))
+        existing_set = self.event_sets.find_event_set(db, resource, (source,dest))
         # Add to the set of edges between source <--> dest
-        self.to_events[(source,dest)] = self._extend_event_set_edge(db, resource, ('E',source,dest),existing_set)[0]
+        #self.graph_to_events[(source,dest)] = 
+        event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest),existing_set)[0]
+        self.active_subgraphs[(source,dest)] = Subgraph.merge(self.active_subgraphs[(source,)], self.active_subgraphs[(dest,)], event)
+        self.active_subgraphs[(source,)] = self.active_subgraphs[(source,dest)]
+        self.active_subgraphs[(dest,)] = self.active_subgraphs[(source,dest)]
+
+        # TODO: should we make these the maximal? replace these with the maximal?
+        
+        #.add_event(self.event_sets.extend_event_set(db, resource, ('P',label,value),existing_set)[0])
 
         logging.debug('--> Adding new edge (%s,%s,%s)'%(source,label, dest))
 
@@ -1475,7 +1323,7 @@ class NewProvenanceStore(ProvenanceStore):
         # But how do we name it? By the entire graph node ID sublist
 
         # Bring in any extra edges from disk
-        self._reclassify_edges(db, resource, source, dest)
+        self.active_subgraphs[(source,dest)].reclassify_edges(db, resource, source, dest)
 
         # Now see what we have done.  Either we have a new connection -- merging subgraphs
         # -- or we have a redundant connection, which is simpler!
@@ -1516,12 +1364,17 @@ class NewProvenanceStore(ProvenanceStore):
             self.graph_nodes.append(source)
             self._add_external_edges(db, resource, source)
 
+        #logging.debug(str(self.internal_edges))
         if source in self.internal_edges:
             logging.debug("--> Adding internal edge %s"%str((label,dest,)))
             self.internal_edges[source].append((label,dest))
+            # self._get_graph_connected(source)
+            # self._get_graph_connected(dest)
         else:
             logging.debug("--> Setting  internal edge %s -> %s"%(source,str((label,dest,))))
             self.internal_edges[source] = [(label,dest)]
+            # self._get_graph_connected(source)
+            # self._get_graph_connected(dest)
 
         if existing_set == None:#len(existing_set) == 0:
             # These are the events for left
@@ -1538,17 +1391,6 @@ class NewProvenanceStore(ProvenanceStore):
 
         return new_edge
 
-    def add_nodeprop(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, Any, int) -> int
-        """
-        Associate a property with a node
-        """
-
-        existing_set = self._find_event_set(db, resource, (node,))
-        self.to_events[(node,)] = self._extend_event_set(db, resource, ('P',label,value),existing_set)[0]
-
-        return 0#self.real_index.add_nodeprop(db, resource, node, label, value, ind)
-
     def flush(self, db, resource):
         # type: (cursor, str) -> None
 
@@ -1560,15 +1402,19 @@ class NewProvenanceStore(ProvenanceStore):
         #logging.info(self.to_events)
         #logging.info(self.event_sets)
         # type: (cursor) -> None
-        if len(self.graph_nodes):
-            logging.debug("** Nodes: **")
-            for i in self.graph_nodes:
-                logging.debug(' %s -> %s'%(i, self.event_sets[self.to_events[(i,)]]))
 
-            if len(self.internal_edges):
-                logging.debug("** Internal edges **")
-                for i in self.internal_edges:
-                    logging.debug(' From %s: %s'%(i,self.internal_edges[i]))
+        for item in self.active_subgraphs.values():
+            item.display()
+
+        # if len(self.graph_nodes):
+        #     logging.debug("** Nodes: **")
+        #     for i in self.graph_nodes:
+        #         logging.debug(' %s -> %s'%(i, self.event_sets[self.graph_to_events[(i,)]]))
+
+        #     if len(self.internal_edges):
+        #         logging.debug("** Internal edges **")
+        #         for i in self.internal_edges:
+        #             logging.debug(' From %s: %s'%(i,self.internal_edges[i]))
 
             # if len(self.external_edges):
             #     logging.debug("** External edges **")
@@ -1578,9 +1424,11 @@ class NewProvenanceStore(ProvenanceStore):
         # logging.debug(self.inverse_events)
 
         self.real_index.flush(db, resource)
+
+        # TODO: flush graphs?
         self.graph_nodes.clear()
-        self.internal_edges.clear()
-        self.external_edges.clear()
+        # self.internal_edges.clear()
+        # self.external_edges.clear()
 
     #################################################################################################
     ### Below, all queries are a proxy to the underlying index service. We flush the cache first. ###
@@ -1620,9 +1468,9 @@ class NewProvenanceStore(ProvenanceStore):
         return self.real_index.get_edges(db, resource)
 
     def reset(self):
-        self.event_sets = {}
-        self.inverse_events = {}
-        self.to_events = {}
-        self.from_events = []
+        self.event_sets = EventManager(self.real_index)
+        #self.event_sets = {}
+        #self.inverse_events = {}
+        #self.graph_to_events = {}
         self.real_index.reset()
 
