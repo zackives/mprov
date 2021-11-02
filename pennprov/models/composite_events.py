@@ -34,8 +34,8 @@ class EventManager:
 
     def _get_uuid(self):
         # type: () -> UUID
-        self.uuid = self.uuid + 1
-        return self.uuid -1
+        #self.uuid = UUID(self.uuid + 1)
+        return uuid.uuid4()#self.uuid -1
 
     def get_event_set_from_id(self, db, resource, result, id):
         #result = set.union(result, self.event_sets[id])
@@ -86,17 +86,19 @@ class EventManager:
             uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
 
         if existing_set:
+            logging.debug("Extending compound event")
             uuid = self.store.add_compound_event(db, resource, self.event_sets[existing_set], uuid)
 
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
-            logging.debug("Node event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
+            logging.debug("Node-property event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
 
             self.inverse_events[result] = nuuid
             self.event_sets[nuuid] = uuid#result
             return (nuuid,True)
         else:
             # Reuse
+            logging.debug("Node event %s reused" %(self.inverse_events[result]))
             return (self.inverse_events[result],False)
 
     def extend_event_set_edge(self, db, resource, tuple, existing_set):
@@ -116,7 +118,7 @@ class EventManager:
 
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
-            logging.debug("Edge event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
+            logging.debug("Edge create event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
             self.inverse_events[result] = uuid
             self.event_sets[nuuid] = result
             return (nuuid,True)
@@ -143,6 +145,7 @@ class EventManager:
         edge = event_op[3]
         id = self._get_id_from_key(resource + ':' + str(event_1) + '.' + str(edge) + '.' + str(event_2) + "\\D")# + str(args))
 
+        # Add the appropriate event to the queue
         self.store.event_queue.append((id, resource, event_op[0], edge, None, str(event_1), str(event_2)))#args))
 
         self.graph_to_events[tuple(node_list)] = id

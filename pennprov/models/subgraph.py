@@ -32,18 +32,20 @@ class Subgraph:
         self.event_manager = emgr
         self.creation_event = creation_event
         self.maximal = self
+        logging.debug("Creating new subgraph with event %s:(%s)"%(creation_event,str(initial_nodeset)))
 
     def merge(first, second, new_event):
         # type: (Subgraph,Subgraph,UUID) -> Subgraph
         """
         Merge two subgraphs, with the new_event has the main "bridge" event
         """
-        ret = Subgraph(first.node_set.union(second.node_set), new_event)
-        ret.internal_edges = first.internal_edges.update(second.internal_edges)
+        ret = Subgraph(first.node_set.union(second.node_set), first.event_manager, new_event)
+        ret.internal_edges = first.internal_edges.copy().update(second.internal_edges)
         ret.external_edges = first.external_edges + second.external_edges
         ret.node_mapping = first.node_mapping + second.node_mapping
         first.set_maximal(ret)
         second.set_maximal(ret)
+        ret.reclassify_internal_edges()
         return ret
 
     def add_event(self, new_event):
@@ -51,11 +53,8 @@ class Subgraph:
         """
         Merge two subgraphs, with the new_event has the main "bridge" event
         """
-        ret = Subgraph(self.node_set, self.event_manager, new_event)
-        ret.internal_edges = self.internal_edges.copy()
-        ret.external_edges = self.external_edges.copy()
-        ret.node_mapping = self.node_mapping.copy()        
-        return ret
+        self.creation_event = new_event
+        return self
 
     def add_external_edges(self, db, resource, node_id):
         # type: (cursor, str, str) -> None
@@ -123,11 +122,13 @@ class Subgraph:
         """
         Clear the write cache, writing any nodes to the DBMS
         """
-        logging.info("Writing subgraph")
-        for node in self.node_set:
+        logging.info("Writing subgraph with event %s:(%s)" %(self.creation_event, str(self.node_set)))
             #set_id = self.event_manager.find_event_set(db, resource, (node,))
-            result = set()
-            self.event_manager.get_event_set_from_id(db, resource, result, self.creation_event)#self.event_manager.event_sets[set_id])
+        result = set()
+        self.event_manager.get_event_set_from_id(db, resource, result, self.creation_event)#self.event_manager.event_sets[set_id])
+
+        # TODO: this won't be the case any more
+        for node in self.node_set:
             self.event_manager.store.add_node_binding(#self.event_sets[set_id]
                 self.creation_event,  'label', resource, node)
 
@@ -137,18 +138,6 @@ class Subgraph:
         # type: (None) -> UUID
 
         return self.creation_event
-
-        # TODO: find the event ID corresponding to the node_list
-
-        # if len(node_list) >= 1:
-        #     logging.debug("Looking up %s"%str(tuple(node_list)))
-        #     ret = self._find_event_set(db, resource, tuple(node_list))
-        #     if ret == None:
-        #         logging.error('Event expression not found: %s'%str(node_list))
-        #     return ret
-
-        # logging.error('Event expression not found: %s'%str(node_list))
-        # return None#self._get_id()
 
     def reclassify_edges(self, db, resource, source, dest):
         # type: (cursor, str, str, str) -> None
@@ -171,12 +160,32 @@ class Subgraph:
         
         return
 
+    def reclassify_internal_edges(self):
+        # type: () -> None
+        """
+        Ensure that any edges that were previously external-facing
+        are now internal edges
+        """
+        remove_these = set()
+        for i in range(0, len(self.external_edges)):
+            (src,label,dst) = self.external_edges[i]
+            if src in self.node_set and dst in self.node_set:
+                if src in self.internal_edges:
+                    self.internal_edges[src].append((label,dst))
+                else:
+                    self.internal_edges[src] = [(label,dst)]
+                remove_these.add((src,label,dst))
+
+        for edge in remove_these:
+            self.external_edges.remove(remove_these)
+        
+        return
 
     def display(self):
         if len(self.node_set):
             logging.debug("** Nodes: **")
             for i in self.node_set:
-                logging.debug(' %s')# -> %s'%(i, self.event_sets[self.graph_to_events[(i,)]]))
+                logging.debug(' %s' %i)# -> %s'%(i, self.event_sets[self.graph_to_events[(i,)]]))
 
             if len(self.internal_edges):
                 logging.debug("** Internal edges **")

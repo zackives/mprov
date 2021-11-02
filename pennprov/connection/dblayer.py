@@ -1223,7 +1223,7 @@ class NewProvenanceStore(ProvenanceStore):
         """
         Clear the write cache, writing any nodes to the DBMS
         """
-        logging.info("Flushing cache")
+        #logging.info("Flushing cache")
 
         # TODO: make it an LRU cache
 
@@ -1267,7 +1267,9 @@ class NewProvenanceStore(ProvenanceStore):
         # TODO: probably don't need
         if node_id not in self.graph_nodes:
             self.graph_nodes.append(node_id)
-            self.active_subgraphs[(node_id,)] = Subgraph(set(node_id), self.event_sets, events[0])
+            subgraphs = set()
+            subgraphs.add(node_id)
+            self.active_subgraphs[(node_id,)] = Subgraph(subgraphs, self.event_sets, events[0])
         return 0
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
@@ -1323,7 +1325,8 @@ class NewProvenanceStore(ProvenanceStore):
         # But how do we name it? By the entire graph node ID sublist
 
         # Bring in any extra edges from disk
-        self.active_subgraphs[(source,dest)].reclassify_edges(db, resource, source, dest)
+        node_set = self.active_subgraphs[(source,dest)].node_set
+        self.active_subgraphs[(source,dest)].external_edges = self.read_external_edges(db, resource, node_set)
 
         # Now see what we have done.  Either we have a new connection -- merging subgraphs
         # -- or we have a redundant connection, which is simpler!
@@ -1331,14 +1334,14 @@ class NewProvenanceStore(ProvenanceStore):
         # This is a new connection, so we need to figure out what's connected (already)
         # and bring in the source + target subgraphs
         if existing_set == None:#len(existing_set) == 0:
-            source_subgraph = self._get_graph_connected(source)
-            dest_subgraph = self._get_graph_connected(dest)
+            source_subgraph = self.active_subgraphs[(source,)]#_get_graph_connected(source)
+            dest_subgraph = self.active_subgraphs[(dest,)]#_get_graph_connected(dest)
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
 
             # This is our graph
-            full_subgraph = source_subgraph + dest_subgraph
+            full_subgraph = Subgraph.merge(source_subgraph, dest_subgraph, event)
         else:
-            full_subgraph = self._get_graph_connected(source)
+            full_subgraph = self.active_subgraphs[(source,)]#self._get_graph_connected(source)
             source_subgraph = full_subgraph
             dest_subgraph = []
 
@@ -1426,7 +1429,7 @@ class NewProvenanceStore(ProvenanceStore):
         self.real_index.flush(db, resource)
 
         # TODO: flush graphs?
-        self.graph_nodes.clear()
+        # self.graph_nodes.clear()
         # self.internal_edges.clear()
         # self.external_edges.clear()
 
