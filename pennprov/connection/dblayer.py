@@ -1301,9 +1301,9 @@ class NewProvenanceStore(ProvenanceStore):
         # Add to the set of edges between source <--> dest
         #self.graph_to_events[(source,dest)] = 
         event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest),existing_set)[0]
-        self.active_subgraphs[(source,dest)] = Subgraph.merge(self.active_subgraphs[(source,)], self.active_subgraphs[(dest,)], event)
-        self.active_subgraphs[(source,)] = self.active_subgraphs[(source,dest)]
-        self.active_subgraphs[(dest,)] = self.active_subgraphs[(source,dest)]
+
+        #new_graph = Subgraph.merge(self.active_subgraphs[(source,)], self.active_subgraphs[(dest,)], event)
+        #self.active_subgraphs[(source,dest)] = new_graph
 
         # TODO: should we make these the maximal? replace these with the maximal?
         
@@ -1324,12 +1324,10 @@ class NewProvenanceStore(ProvenanceStore):
         # TODO: AND the source event ID, the dest event ID, the edge event ID
         # But how do we name it? By the entire graph node ID sublist
 
-        # Bring in any extra edges from disk
-        node_set = self.active_subgraphs[(source,dest)].node_set
-        self.active_subgraphs[(source,dest)].external_edges = self.read_external_edges(db, resource, node_set)
-
         # Now see what we have done.  Either we have a new connection -- merging subgraphs
         # -- or we have a redundant connection, which is simpler!
+
+        new_edge = self.real_index.add_edge_uuid(db, resource, source, label, dest)
 
         # This is a new connection, so we need to figure out what's connected (already)
         # and bring in the source + target subgraphs
@@ -1339,11 +1337,14 @@ class NewProvenanceStore(ProvenanceStore):
             logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
 
             # This is our graph
-            full_subgraph = Subgraph.merge(source_subgraph, dest_subgraph, event)
+            new_graph = Subgraph.merge(source_subgraph, dest_subgraph, event)
         else:
-            full_subgraph = self.active_subgraphs[(source,)]#self._get_graph_connected(source)
-            source_subgraph = full_subgraph
+            new_graph = self.active_subgraphs[(source,)]#self._get_graph_connected(source)
+            source_subgraph = new_graph
             dest_subgraph = []
+
+        # Bring in any extra edges from disk
+        #new_graph.external_edges = self.read_external_edges(db, resource, new_graph.node_set)
 
         # Internal edges are adjacency list at the source
         # if source in self.graph_nodes and dest in self.graph_nodes:
@@ -1355,42 +1356,44 @@ class NewProvenanceStore(ProvenanceStore):
         # else:
         #     logging.debug('--> At least one endpoint is NOT in the current graph')
         
-        new_edge = self.real_index.add_edge_uuid(db, resource, source, label, dest)
+        # Update all points in the subgraph to point to the same subgraph object
+        for node in new_graph.node_set:
+            self.active_subgraphs[(node,)] = new_graph
 
         # Ensure we bring in anything connected to the dest
         if dest not in self.graph_nodes:
             self.graph_nodes.append(dest)
-            self._add_external_edges(db, resource, dest)
+            new_graph.add_external_edges(db, resource, dest)
 
         # Ensure we bring in anything connected to the source
         if source not in self.graph_nodes:
             self.graph_nodes.append(source)
-            self._add_external_edges(db, resource, source)
+            new_graph.add_external_edges(db, resource, source)
 
         #logging.debug(str(self.internal_edges))
-        if source in self.internal_edges:
+        if source in new_graph.get_internal_edges():
             logging.debug("--> Adding internal edge %s"%str((label,dest,)))
-            self.internal_edges[source].append((label,dest))
+            new_graph.internal_edges[source].append((label,dest))
             # self._get_graph_connected(source)
             # self._get_graph_connected(dest)
         else:
             logging.debug("--> Setting  internal edge %s -> %s"%(source,str((label,dest,))))
-            self.internal_edges[source] = [(label,dest)]
+            new_graph.internal_edges[source] = [(label,dest)]
             # self._get_graph_connected(source)
             # self._get_graph_connected(dest)
 
         if existing_set == None:#len(existing_set) == 0:
             # These are the events for left
-            left = self.event_sets[self._get_event_expression_id(db, resource, source_subgraph)]
+            left = source_subgraph.get_event_expression_id()
             # These are the events for right
-            right = self.event_sets[self._get_event_expression_id(db, resource, dest_subgraph)]
+            right = dest_subgraph.get_event_expression_id()
 
-            self._merge_subgraph_events(db, resource, full_subgraph, ('D',left,right,new_edge))
+            self.event_sets.merge_subgraph_events(db, resource, new_graph.node_set, ('D',left,right,new_edge))
         else:
             # These are the events for left
-            existing_graph = self.event_sets[self._get_event_expression_id(db, resource, source_subgraph)]
+            existing_graph = source_subgraph.get_event_expression_id()
 
-            self._merge_subgraph_events(db, resource, full_subgraph, ('D',existing_graph,None,new_edge))
+            self.event_sets.merge_subgraph_events(db, resource, new_graph.node_set, ('D',existing_graph,None,new_edge))
 
         return new_edge
 

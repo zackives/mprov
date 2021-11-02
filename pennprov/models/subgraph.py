@@ -21,8 +21,8 @@ class Subgraph:
 
     node_mapping = []           # type: List[UUID]
 
-    internal_edges = {} # type: Mapping[UUID,Tuple[str,UUID]]
-    external_edges = [] # type: List[Tuple[UUID,str,UUID]]
+    internal_edges = None       # type: Mapping[UUID,Tuple[str,UUID]]
+    external_edges = None       # type: List[Tuple[UUID,str,UUID]]
 
     maximal = None              # type: Subgraph
 
@@ -31,6 +31,8 @@ class Subgraph:
         self.node_set = frozenset(initial_nodeset)
         self.event_manager = emgr
         self.creation_event = creation_event
+        self.internal_edges = {}
+        self.external_edges = []
         self.maximal = self
         logging.debug("Creating new subgraph with event %s:(%s)"%(creation_event,str(initial_nodeset)))
 
@@ -152,7 +154,7 @@ class Subgraph:
                 if source in self.internal_edges:
                     self.internal_edges[source].append((label,dest))
                 else:
-                    self.internal_edges = [(label,dest)]
+                    self.internal_edges[source] = [(label,dest)]
                 remove_these.add((src,label,dst))
 
         for edge in remove_these:
@@ -199,3 +201,9 @@ class Subgraph:
     def get_maximal(self):
         # type: () -> Subgraph
         return self.maximal
+
+    def get_internal_edges(self):
+        if not self.internal_edges:
+            self.internal_edges = {}
+            
+        return self.internal_edges

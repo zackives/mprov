@@ -137,6 +137,15 @@ class EventManager:
         # type: (Tuple[Any], UUID) -> None
         self.graph_to_events[tup] = id
 
+    def _get_id(self):
+        # type: () -> UUID
+        return uuid.uuid4()
+
+    def _get_id_from_key(self, key):
+        # type: (str) -> UUID
+        return uuid.uuid5(uuid.NAMESPACE_URL, key)
+
+
     def merge_subgraph_events(self, db, resource, node_list, event_op):
         # TODO: store this in the memo table
         logging.debug('--> New composite event to connect subgraphs: %s'%str(event_op))
