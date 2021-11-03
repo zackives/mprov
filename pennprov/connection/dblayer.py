@@ -12,6 +12,7 @@
 """
 
 from __future__ import print_function
+#from _typeshed import NoneType
 
 from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 import logging
@@ -1296,8 +1297,16 @@ class NewProvenanceStore(ProvenanceStore):
         subgraph, and see where this takes us.
         """
 
-        # First, see if there are already edges between the source + dest
-        existing_set = self.event_sets.find_event_set(db, resource, (source,dest))
+        # First, see if this edge is internal to a graph
+        existing_set = None
+        new_graph = None
+        for graph in self.active_subgraphs.values():
+            #if source in graph.node_set and dest in graph.node_set:
+            if graph.contains_nodes([source,dest]):
+                existing_set = graph.get_event_expression_id()
+                new_graph = graph
+                break
+
         # Add to the set of edges between source <--> dest
         #self.graph_to_events[(source,dest)] = 
         event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest),existing_set)[0]
@@ -1331,17 +1340,21 @@ class NewProvenanceStore(ProvenanceStore):
 
         # This is a new connection, so we need to figure out what's connected (already)
         # and bring in the source + target subgraphs
+
+        ## TODO: we should: (1) find the two active graphs, (2) find their creation events, (3) find their connection event.
+        ##       (4) look up the merges of the creation events, to see if there is one doing the same thing, (5) if so recycle
+        #        that event, else create a new one.
         if existing_set == None:#len(existing_set) == 0:
-            source_subgraph = self.active_subgraphs[(source,)]#_get_graph_connected(source)
-            dest_subgraph = self.active_subgraphs[(dest,)]#_get_graph_connected(dest)
-            logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
+            source_subgraph = self.active_subgraphs[(source,)].get_maximal()#_get_graph_connected(source)
+            dest_subgraph = self.active_subgraphs[(dest,)].get_maximal()#_get_graph_connected(dest)
+            logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph.node_set,dest_subgraph.node_set))
 
             # This is our graph
             new_graph = Subgraph.merge(source_subgraph, dest_subgraph, event)
-        else:
-            new_graph = self.active_subgraphs[(source,)]#self._get_graph_connected(source)
-            source_subgraph = new_graph
-            dest_subgraph = []
+        #else:
+            #new_graph = self.active_subgraphs[(source,)]#self._get_graph_connected(source)
+            #source_subgraph = new_graph.get_maximal()
+            #dest_subgraph = []
 
         # Bring in any extra edges from disk
         #new_graph.external_edges = self.read_external_edges(db, resource, new_graph.node_set)
@@ -1358,7 +1371,7 @@ class NewProvenanceStore(ProvenanceStore):
         
         # Update all points in the subgraph to point to the same subgraph object
         for node in new_graph.node_set:
-            self.active_subgraphs[(node,)] = new_graph
+            self.active_subgraphs[(node,)].set_maximal(new_graph)
 
         # Ensure we bring in anything connected to the dest
         if dest not in self.graph_nodes:
@@ -1391,7 +1404,7 @@ class NewProvenanceStore(ProvenanceStore):
             self.event_sets.merge_subgraph_events(db, resource, new_graph.node_set, ('D',left,right,new_edge))
         else:
             # These are the events for left
-            existing_graph = source_subgraph.get_event_expression_id()
+            existing_graph = new_graph.get_event_expression_id()
 
             self.event_sets.merge_subgraph_events(db, resource, new_graph.node_set, ('D',existing_graph,None,new_edge))
 
