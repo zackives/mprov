@@ -87,7 +87,7 @@ class Subgraph:
             self.external_edges.append((node_id,label,dest))
         return
 
-    def get_graph_connected(self,node):
+    def get_connected_nodes(self,node):
         # type: (str) -> List[str]
         # TODO: transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
@@ -105,7 +105,7 @@ class Subgraph:
 
         return ret
 
-    def get_graph_connected_from(self,node, ret):
+    def get_nodes_connected_from(self,node, ret):
         # type: (str, List[str]) -> None
         # transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
@@ -120,7 +120,7 @@ class Subgraph:
 
         return ret
 
-    def get_graph_connected_to(self,node, ret):
+    def get_nodes_connected_to(self,node, ret):
         # type: (str, List[str]) -> None
         # transitively assemble all nodes in our graph that are
         # reachable via internal edges from node
