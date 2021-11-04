@@ -6,7 +6,7 @@ import logging
 import uuid
 from uuid import UUID
 
-#from pennprov.connection.dblayer import EventBindingProvenanceStore
+from pennprov.connection.provenance_store import ProvenanceStore
 
 from psycopg2.extensions import cursor
 
@@ -15,29 +15,29 @@ class EventManager:
     uuid = None
     binding = 0
 
-    store = None            # type: EventBindingProvenanceStore
+    store = None            # type: ProvenanceStore
 
     # ID to EVENT SET
     event_sets = {}         # type: Mapping[UUID, Set(Tuple)]
     # EVENT SET to ID
-    inverse_events = {}     # type: Mapping[Set(Tuple), UUID]
+    inverse_events = {}     # type: Mapping[frozenset(Tuple), UUID]
 
     # Every node was created according to some event ID (which might also lead to many other things)
     # TODO: get rid of this?
     graph_to_events = {}
 
     def __init__(self,prov_store):
-        # type: (EventBindingProvenanceStore) -> None
+        # type: (ProvenanceStore) -> None
         self.store = prov_store
-        self.uuid = uuid.uuid4().int
+        #self.uuid = uuid.uuid4().int
         pass
 
     def _get_uuid(self):
         # type: () -> UUID
         #self.uuid = UUID(self.uuid + 1)
-        return uuid.uuid4()#self.uuid -1
+        return self.store.get_id()
 
-    def get_event_set_from_id(self, db, resource, result, id):
+    def get_event_expression_from_id(self, db, resource, result, id):
         #result = set.union(result, self.event_sets[id])
         """
         Given an eventset UUID, find all associated events.  May require transitive closure
@@ -51,64 +51,70 @@ class EventManager:
         if event == None:
             return result
         if event[2] == 'C' or event[2] == 'D':
-            self.get_event_set_from_id(db, resource, result, event[5])
-            self.get_event_set_from_id(db, resource, result, event[6])
+            self.get_event_expression_from_id(db, resource, result, event[5])
+            self.get_event_expression_from_id(db, resource, result, event[6])
         else:
+            logging.debug("Found event %s" %event)
             result.add(event)
 
         return result
 
-    def extend_event_set_from_base(self, db, resource, tuple, baseline):
-        # type: (str, str, Tuple[Any], str) -> Tuple[str,bool]
-        return self.extend_event_set(db, resource, tuple,\
-            self.find_event_set(db, resource, baseline))
+    def create_base_event(self, db, resource, tuple):
+        # type: (cursor, str, Tuple[Any]) -> str
+        return self.extend_event_set(db, resource, tuple, None)[0]
 
-    def extend_event_set(self, db, resource, tuple, existing_set):
-        # type: (str, str, Tuple[Any], str) -> Tuple[str,bool]
+    def extend_event_set(self, db, resource, tuple, existing_event):
+        # type: (str, str, Tuple[Any], UUID) -> Tuple[str,bool]
         """
         Copy an event set node and add more items. This is done via composite events.
         """
 
         # A singleton set with the event tuple
-        result = set([tuple])
+        result = {tuple,}
 
         # Look up any items from the prior set (look up by its ID) and add
         # them to our set in the lattice
-        if existing_set:
-            result = self.get_event_set_from_id(db, resource, result, self.find_event_set(db, resource, existing_set))#self.event_sets[existing_set])
+        if existing_event:
+            result = self.get_event_expression_from_id(db, resource, result, \
+                existing_event)
             
-        result = frozenset(result)
-
         # Are we adding a node event, or a node property event?
+        uuid = None         # type: UUID
+        nuuid = None        # type: UUID
         if tuple[0] == 'N':
             uuid = self.store.add_node_event(db, resource, tuple[1], '')
         else:
             uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
 
-        if existing_set:
-            logging.debug("Extending compound event")
-            uuid = self.store.add_compound_event(db, resource, self.event_sets[existing_set], uuid)
-
+        result = frozenset(result)
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
-            logging.debug("Node-property event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
+            if existing_event:
+                uuid = self.store.add_compound_event(db, resource, existing_event, uuid)
+                logging.debug("Creating compound event: %s" %(str(uuid)))
+
+            logging.debug("Extended (node-property) event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
 
             self.inverse_events[result] = nuuid
             self.event_sets[nuuid] = uuid#result
             return (nuuid,True)
         else:
             # Reuse
-            logging.debug("Node event %s reused" %(self.inverse_events[result]))
+            logging.debug("Node event %s reused: %s" %(self.inverse_events[result],str(set(result))))
             return (self.inverse_events[result],False)
 
-    def extend_event_set_edge(self, db, resource, tuple, existing_set):
-        # type: (str, str, Tuple[Any], str) -> Tuple[str,bool]
+    def extend_event_set_edge(self, db, resource, tuple, existing_event):
+        # type: (str, str, Tuple[Any], UUID) -> Tuple[str,bool]
         """
         Copy an event set node and add more items
         """
 
-        if existing_set:
-            result = set([tuple]).union(self._find_event_set(db, resource, existing_set))#self.event_sets[existing_set])
+        if existing_event:
+            result = set()
+            result = self.get_event_expression_from_id(db, resource, result, \
+                existing_event)
+            result = result.union(set([tuple]))
+                #self.find_event_set(db, resource, existing_set))#self.event_sets[existing_set])
             
             result = frozenset(result)
         else:
@@ -118,24 +124,12 @@ class EventManager:
 
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
-            logging.debug("Edge create event: (%s,%s:%s)"%(nuuid,uuid,str(result)))
+            logging.debug("Edge create event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
             self.inverse_events[result] = uuid
             self.event_sets[nuuid] = result
             return (nuuid,True)
         else:
             return (self.inverse_events[result],True)
-
-
-    def find_event_set(self, db, resource, id):
-        # type: (cursor, str, Tuple) -> Set[Any]
-        if id in self.graph_to_events:
-            return self.graph_to_events[id]
-        else:
-            return None
-
-    def associate_event(self, tup, id):
-        # type: (Tuple[Any], UUID) -> None
-        self.graph_to_events[tup] = id
 
     def _get_id(self):
         # type: () -> UUID
@@ -157,7 +151,7 @@ class EventManager:
         # Add the appropriate event to the queue
         self.store.event_queue.append((id, resource, event_op[0], edge, None, str(event_1), str(event_2)))#args))
 
-        self.graph_to_events[tuple(node_list)] = id
+        #self.graph_to_events[tuple(node_list)] = id
 
         self.event_sets[id] = id
         # TODO:

@@ -6,7 +6,6 @@ import logging
 from psycopg2.extensions import cursor
 
 from pennprov.models.composite_events import EventManager
-#from pennprov.connection.dblayer import EventBindingProvenanceStore
 
 import uuid
 from uuid import UUID
@@ -27,11 +26,12 @@ class Subgraph:
     node_to_event_tree = {}     # type: Mapping[UUID,UUID]
 
     maximal = None              # type: Subgraph
+    parent = None               # type: Subgraph
 
     written = False
 
     def __init__(self, initial_nodeset, emgr, creation_event):
-        # type: (Set[UUID], EventBindingProvenanceStore, UUID) -> None
+        # type: (Set[UUID], EventManager, UUID) -> None
         self.node_set = frozenset(initial_nodeset)
         self.node_mapping = list(initial_nodeset)
         self.event_manager = emgr
@@ -43,7 +43,8 @@ class Subgraph:
         for node in initial_nodeset:
             self.node_to_event_tree[node] = creation_event
         self.maximal = self
-        logging.debug("Creating new subgraph with event %s:(%s)"%(creation_event,str(initial_nodeset)))
+        self.parent = None
+        logging.debug("Creating new subgraph %s"%self)
 
     def merge(first, second, new_event):
         # type: (Subgraph,Subgraph,UUID) -> Subgraph
@@ -60,7 +61,9 @@ class Subgraph:
             second.node_to_event_tree = {}
         ret.node_to_event_tree = first.node_to_event_tree.copy().update(second.node_to_event_tree)
         first.set_maximal(ret)
+        first.set_parent(ret)
         second.set_maximal(ret)
+        second.set_parent(ret)
         ret.reclassify_internal_edges()
         ret.written = False
         return ret
@@ -68,9 +71,14 @@ class Subgraph:
     def add_event(self, new_event):
         # type: (UUID) -> Subgraph
         """
-        Merge two subgraphs, with the new_event has the main "bridge" event
+        Update this subgraph to have a new "root" event (which should include the old version as well)
         """
-        self.creation_event = new_event
+        self.creation_event = new_event # Update this to be our "root" event
+
+        # If this subgraph is within a parent graph, bubble the update upwards
+        if self.parent:
+            self.parent.add_event(new_event)
+
         self.written = False
         return self
 
@@ -80,10 +88,10 @@ class Subgraph:
         Given a new frontier node, find any adjacent edges and add them
         to our external-facing set
         """
-        for (src,label) in self.store.get_connected_from_label(db, resource, node_id, None):
+        for (src,label) in self.store.get_connected_from(db, resource, node_id, None):
             self.external_edges.append((src,label,node_id))
 
-        for (dest,label) in self.store.get_connected_to_label(db, resource, node_id, None):
+        for (dest,label) in self.store.get_connected_to(db, resource, node_id, None):
             self.external_edges.append((node_id,label,dest))
         return
 
@@ -143,10 +151,10 @@ class Subgraph:
         if self.written:
             return
 
-        logging.info("Writing subgraph with event %s:(%s)" %(self.creation_event, str(self.node_set)))
-            #set_id = self.event_manager.find_event_set(db, resource, (node,))
+        logging.info("Writing subgraph %s" %(self))
+
         result = set()
-        self.event_manager.get_event_set_from_id(db, resource, result, self.creation_event)#self.event_manager.event_sets[set_id])
+        self.event_manager.get_event_expression_from_id(db, resource, result, self.creation_event)#self.event_manager.event_sets[set_id])
 
         # TODO: this won't be the case any more
         for node in self.node_set:
@@ -199,6 +207,10 @@ class Subgraph:
         # type: (Subgraph) -> None
         self.maximal = max
 
+    def set_parent(self, par):
+        # type: (Subgraph) -> None
+        self.parent = par
+
     def get_maximal(self):
         # type: () -> Subgraph
         return self.maximal
@@ -211,3 +223,6 @@ class Subgraph:
 
     def contains_nodes(self,nodes):
         return sum([1 if n in self.node_set else 0 for n in nodes]) == len(nodes)
+
+    def __str__(self):
+        return str(self.creation_event) + ':' + set(self.node_set).__str__().replace('{http://mprov.md2k.org}','')

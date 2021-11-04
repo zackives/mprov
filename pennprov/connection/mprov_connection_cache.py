@@ -93,7 +93,7 @@ class MProvConnectionCache:
         :return: the connection associated with connection_key or a newly created connection
         """
         connection = cls.connections.get(connection_key, None)
-        if connection:
+        if connection and logger:
             logger.debug(
                 'MProvConnectionCache: process %s retrieved cached connection %s', os.getpid(), id(connection))
         else:

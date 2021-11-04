@@ -16,14 +16,14 @@ from __future__ import print_function
 
 from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 import logging
-import os
 
 from collections import OrderedDict
 
 import pennprov
-from pennprov.config import config
 from pennprov.models.subgraph import Subgraph
 from pennprov.models.composite_events import EventManager
+
+from pennprov.connection.provenance_store import ProvenanceStore, Factory
 
 import datetime
 
@@ -35,101 +35,6 @@ from suffix_tree import Tree
 from psycopg2.extensions import cursor
 from psycopg2.extras import execute_values
 import psycopg2.extras
-
-class Factory:
-    registered_index_types = dict() # type: Mapping[str, Callable[[], ProvenanceStore]]
-
-    @classmethod 
-    def register_index_type(cls, key, creator):
-        # type: (str, Callable[[], ProvenanceStore]) -> None 
-        cls.registered_index_types[key.lower()] = creator
-
-    @classmethod
-    def get_index(cls):
-        # type: () -> ProvenanceStore
-        """
-        Retrieve the appropriate provenance indexing subsystem
-        """
-        key = os.environ.get('MPROV_INDEX')
-        if key is None:
-            key = config.provenance.get('index', 'new')
-
-        creator = cls.registered_index_types.get(key.lower())
-
-        if creator is None:
-            raise ValueError(f'no creator registered for {key}')
-        return creator()
-
-
-class ProvenanceStore:
-    """
-    A persistent provenance graph storage subsystem.
-    """
-
-    Factory.register_index_type('no-op', lambda: ProvenanceStore())
-
-    def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> None
-        return 1
-
-    def add_edge(self, db, resource, source, label, dest):
-        # type: (cursor, str, str, str, str) -> None
-       return 1
-
-    def add_nodeprop(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, Any, int) -> None
-        return 1
-
-    def flush(self, db, resource):
-        return
-
-    def reset(self):
-        return
-
-    def create_tables(self, cursor):
-        # type: (cursor) -> None
-        return
-
-    def clear_tables(self, db, graph):
-        # type: (cursor, str) -> None
-        return
-
-    def get_provenance_data(self, db, resource, token):
-        # type: (cursor, str, str) -> List[Dict]
-        return
-
-    def get_connected_to(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[str]
-        return
-
-    def get_connected_from(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[str]
-        return
-
-    def get_connected_to_labeled(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        return
-
-    def get_connected_from_labe(self, db, resource, token, label1):
-        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
-        return
-
-    def get_edges(self, db, resource):
-        #type: (cursor, str) -> List[Tuple]
-        return []
-
-    def get_nodes(self, db, resource):
-        #type: (cursor, str) -> List[Dict]
-        return []
-
-    def _get_id(self):
-        # type: () -> UUID
-        return uuid.uuid4()
-
-    def _get_id_from_key(self, key):
-        # type: (str) -> UUID
-        return uuid.uuid5(uuid.NAMESPACE_URL, key)
-
 
 # TO DO:
 #  stream the update log
@@ -350,7 +255,7 @@ class SQLProvenanceStore(ProvenanceStore):
                             (resource, token, label1))
         return [x[0] for x in db.fetchall()]
 
-    def get_connected_to_label(self, db, resource, token, label1):
+    def get_connected_to_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
         self.flush(db, resource)
         if label1 is None:
@@ -360,7 +265,7 @@ class SQLProvenanceStore(ProvenanceStore):
                             (resource, token, label1))
         return [(x[0],x[1]) for x in db.fetchall()]
 
-    def get_connected_to(self, db, resource, token, label1):
+    def get_connected_to_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
         self.flush(db, resource)
         if label1 is None:
@@ -529,7 +434,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
-            uuid = self._get_id_from_key(node + '\\' + label)
+            uuid = self.get_id_from_key(node + '\\' + label)
             self.binding_queue.append((id,ind,None,value,None,None,None,None,None,None,uuid,None))
         return
 
@@ -538,7 +443,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
-            uuid = self._get_id_from_key(node + '\\' + label)
+            uuid = self.get_id_from_key(node + '\\' + label)
             self.binding_queue.append((id,ind,None,None,value,None,None,None,None,None,uuid,None))
         return
 
@@ -547,7 +452,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
-            uuid = self._get_id_from_key(node + '\\' + label)
+            uuid = self.get_id_from_key(node + '\\' + label)
             self.binding_queue.append((id,ind,None,None,None,None,value,None,None,None,uuid,None))
         return
 
@@ -556,7 +461,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         ins_str = (id,resource,node,label,ind)
         if ins_str not in self.nodeprop_pool:
             self.nodeprop_pool.add(ins_str)
-            uuid = self._get_id_from_key(node + '\\' + label)
+            uuid = self.get_id_from_key(node + '\\' + label)
             self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
         return
 
@@ -709,7 +614,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         return [x[1] for x in db.fetchall()]
 
-    def get_connected_to_label(self, db, resource, token, label1):
+    def get_connected_to_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
         self.flush(db, resource)
         if label1 is None:
@@ -730,7 +635,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
 
         return [(x[1],x[2]) for x in db.fetchall()]
 
-    def get_connected_from_label(self, db, resource, token, label1):
+    def get_connected_from_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple(str,str)]
         self.flush(db, resource)
         if label1 is None:
@@ -885,7 +790,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         """
         Adds a "compound" event with two child events
         """
-        id = self._get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
+        id = self.get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
 
         self.event_queue.append((id, resource, 'C', None, None, str(event_1), str(event_2)))#args))
         return id
@@ -896,7 +801,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         Adds an event corresponding to a node
         """
         if id == None:
-            id = self._get_id_from_key(resource + ':' + label + '\\N')# + str(args))
+            id = self.get_id_from_key(resource + ':' + label + '\\N')# + str(args))
 
         self.event_queue.append((id, resource, 'N', label, None, None, None))#args))
         return id
@@ -907,7 +812,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         Adds an event corresponding to an edge
         """
         if id == None:
-            id = self._get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
+            id = self.get_id_from_key(resource + ':' + label + '\\E')# + '\\N' + str(args))
         self.event_queue.append((id, resource, 'E', label, None, None, None))
         return id
 
@@ -917,7 +822,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         Adds an event corresponding to a node property
         """
         if id == None:
-            id = self._get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
+            id = self.get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
         self.event_queue.append((id, resource, 'P', label, None, None, None))#args))
         return id
 
@@ -1194,6 +1099,7 @@ class NewProvenanceStore(ProvenanceStore):
     # internal_edges = {}
     # external_edges = []
 
+    # This should become a LRU cache?
     graph_nodes = []
 
     active_subgraphs = OrderedDict()        # type: Mapping[Tuple[Any],Subgraph]
@@ -1230,15 +1136,6 @@ class NewProvenanceStore(ProvenanceStore):
 
         for graph in self.active_subgraphs.values():
             graph.write_self(db, resource)
-        # for node in self.dirty_nodes:
-        #     set_id = self.event_sets.find_event_set(db, resource, (node,))
-        #     #self.event_set[set_id]
-        #     result = set()
-        #     self.event_sets.get_event_set_from_id(db, resource, result, self.event_sets[set_id])
-        #     #logging.debug("Persisting %s"%result)
-        #     #self.real_index.add_node(db, resource, label, node_id)
-        #     self.real_index.add_node_binding(self.event_sets[set_id],  'label', resource, node)
-
         # self.dirty_nodes.clear()
         
 
@@ -1258,36 +1155,32 @@ class NewProvenanceStore(ProvenanceStore):
         Only write the node once we think the node properties are all assigned.
         """
 
-        events = self.event_sets.extend_event_set_from_base(db, resource, ('N',label), (node_id,))
-        self.event_sets.associate_event((node_id,), events[0])
-
-        #if not events[1]:
-            # self.dirty_nodes.add(node_id)
-        #   self.active_subgraphs[(node_id,)] = Subgraph(set(node_id), self.event_sets, events[0])
-
-        # TODO: probably don't need
         if node_id not in self.graph_nodes:
+            node_create_event = self.event_sets.create_base_event(db, resource, ('N',label))
+            
+            ## TODO: deprecate?
             self.graph_nodes.append(node_id)
-            subgraphs = set()
-            subgraphs.add(node_id)
-            self.active_subgraphs[(node_id,)] = Subgraph(subgraphs, self.event_sets, events[0])
-        return 0
 
-    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+            # Create a subgraph with a singleton node
+            self.active_subgraphs[(node_id,)] = Subgraph({node_id,}, self.event_sets, node_create_event)
+
+        return node_id
+
+    def add_nodeprop(self, db, resource, node_id, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
         """
-        Associate a property with a node
+        Associate a property with a node.  Creates a new event to add the property, and associates that with
+        the node's event.  Updates the containing subgraph(s) with the new "root" event.
         """
 
-        existing_set = self.event_sets.find_event_set(db, resource, (node,))
-        #self.graph_to_events[(node,)]
+        prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
+            self.active_subgraphs[(node_id,)].creation_event)
 
         # Update the node ID's subgraph to include the property events
-        self.active_subgraphs[(node,)] = self.active_subgraphs[(node,)].add_event(self.event_sets.extend_event_set(db, resource, ('P',label,value),existing_set)[0])
+        self.active_subgraphs[(node_id,)] = self.active_subgraphs[(node_id,)].add_event(\
+            prop_event)
         
-        # = self.event_sets.extend_event_set(db, resource, ('P',label,value),existing_set)[0]
-
-        return 0#self.real_index.add_nodeprop(db, resource, node, label, value, ind)
+        return node_id
 
 
     def add_edge(self, db, resource, source, label, dest):
@@ -1347,7 +1240,7 @@ class NewProvenanceStore(ProvenanceStore):
         if existing_set == None:#len(existing_set) == 0:
             source_subgraph = self.active_subgraphs[(source,)].get_maximal()#_get_graph_connected(source)
             dest_subgraph = self.active_subgraphs[(dest,)].get_maximal()#_get_graph_connected(dest)
-            logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph.node_set,dest_subgraph.node_set))
+            logging.debug('--> Connecting (%s) to (%s)'%(source_subgraph,dest_subgraph))
 
             # This is our graph
             new_graph = Subgraph.merge(source_subgraph, dest_subgraph, event)
@@ -1468,12 +1361,12 @@ class NewProvenanceStore(ProvenanceStore):
         self.real_index.flush(db, resource)
         return self.real_index.get_connected_to(db, resource, token, label1)
 
-    def get_connected_from_label(self, db, resource, token, label1):
+    def get_connected_from_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple[str,str]]
         self.real_index.flush(db, resource)
         return self.real_index.get_connected_from_label(db, resource, token, label1)
 
-    def get_connected_to_label(self, db, resource, token, label1):
+    def get_connected_to_labeled(self, db, resource, token, label1):
         # type: (cursor, str, str, str) -> List[Tuple[str,str]]
         self.real_index.flush(db, resource)
         return self.real_index.get_connected_to_label(db, resource, token, label1)
