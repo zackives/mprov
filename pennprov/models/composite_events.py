@@ -83,20 +83,27 @@ class EventManager:
         nuuid = None        # type: UUID
         if tuple[0] == 'N':
             uuid = self.store.add_node_event(db, resource, tuple[1], '')
+            logging.debug("Creating base node event: %s" %(str(uuid)))
         else:
             uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
+            logging.debug("Creating base property event: %s" %(str(uuid)))
 
         result = frozenset(result)
         if result not in self.inverse_events:
             nuuid = self._get_uuid()
             if existing_event:
-                uuid = self.store.add_compound_event(db, resource, existing_event, uuid)
-                logging.debug("Creating compound event: %s" %(str(uuid)))
-
-            logging.debug("Extended (node-property) event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
+                existing_event_uuid = self.event_sets[existing_event]
+                uuid = self.store.add_compound_event(db, resource, existing_event_uuid, uuid)
+                #logging.debug("Creating compound event: %s" %(str(uuid)))
+                logging.debug("Extended (node-property) event: (e.%s/%s:%s)"%(nuuid,uuid,str(set(result))))
+            else:
+                logging.debug("Node event: (e.%s/%s:%s)"%(nuuid,uuid,str(set(result))))
 
             self.inverse_events[result] = nuuid
             self.event_sets[nuuid] = uuid#result
+
+            # Temporary
+            self.store.flush(db, resource)
             return (nuuid,True)
         else:
             # Reuse

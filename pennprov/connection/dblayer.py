@@ -755,6 +755,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return ret_list
 
     def flush(self, db, resource):
+        logging.warning('Flushed store')
         # type: (cursor, str) -> None
         self._write_events(db)
         self._write_bindings(db)
@@ -793,6 +794,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         id = self.get_id_from_key(resource + ':' + str(event_1) + str(event_2) + "\\C")# + str(args))
 
         self.event_queue.append((id, resource, 'C', None, None, str(event_1), str(event_2)))#args))
+
         return id
 
     def add_node_event(self, db, resource, label, args, id=None):
@@ -827,6 +829,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return id
 
     def reset(self):
+        logging.error('Reset store')
         self.event_queue = []
         self.binding_queue = []
         self.total = 0
@@ -1156,6 +1159,7 @@ class NewProvenanceStore(ProvenanceStore):
         """
 
         if node_id not in self.graph_nodes:
+            logging.debug('* ADD NODE ' + node_id)
             node_create_event = self.event_sets.create_base_event(db, resource, ('N',label))
             
             ## TODO: deprecate?
@@ -1173,6 +1177,7 @@ class NewProvenanceStore(ProvenanceStore):
         the node's event.  Updates the containing subgraph(s) with the new "root" event.
         """
 
+        logging.debug('* ADD PROP ' + node_id + "." + label + '=' + value)
         prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
             self.active_subgraphs[(node_id,)].creation_event)
 
@@ -1190,6 +1195,7 @@ class NewProvenanceStore(ProvenanceStore):
         subgraph, and see where this takes us.
         """
 
+        logging.debug('* ADD EDGE (' + source + ',' + label + ',' + dest + ')')
         # First, see if this edge is internal to a graph
         existing_set = None
         new_graph = None
