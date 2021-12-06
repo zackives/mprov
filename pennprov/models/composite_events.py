@@ -125,7 +125,7 @@ class EventManager:
             return (self.inverse_events[result],False)
 
     def extend_event_set_edge(self, db, resource, tuple, existing_event):
-        # type: (str, str, Tuple[Any], UUID) -> Tuple[str,bool]
+        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,bool]
         """
         Copy an event set node and add more items
         """
@@ -140,7 +140,9 @@ class EventManager:
         else:
             result = frozenset([tuple])
 
-        uuid = self.store.add_edge_event(db, resource, tuple[1], tuple[2])
+        logging.debug('Extend Edge Tuple %s'%str(tuple))
+        uuid = self.store.add_edge_event(db, resource, tuple[3], tuple[2])
+        self.store.add_edge_binding(uuid, resource, tuple[1], tuple[3], tuple[2])
 
         if result not in self.inverse_events:
             nuuid = uuid#self._get_uuid()

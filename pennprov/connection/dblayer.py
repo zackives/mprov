@@ -400,19 +400,20 @@ class EventBindingProvenanceStore(ProvenanceStore):
         cursor.execute("DELETE FROM MProv_Event WHERE _resource = (%s)", (graph, ))
 
 
-    def add_node_binding(self, id, label, resource, args):
+    def add_node_binding(self, n_id, label, resource, args):
         # type: (str, str, str, str, str) -> None
-        ins_str = (id,resource,label,args)
+        ins_str = (n_id,resource,label,args)
         if ins_str not in self.node_pool:
             self.node_pool.add(ins_str)
-            self.binding_queue.append((id,None,None,args,None,None,None,None,None,None,None,None))
+            self.binding_queue.append((n_id,None,None,args,None,None,None,None,None,None,None,None))
 
-    def add_edge_binding(self, id, resource, source, label, dest):
+    def add_edge_binding(self, e_id, resource, source, label, dest):
         # type: (str, str, str, str, str) -> None
-        ins_str = (id,source,resource,label,dest)
+        ins_str = (e_id,source,resource,label,dest)
+        logging.debug(ins_str)
         if ins_str not in self.edge_pool:
             self.edge_pool.add(ins_str)
-            self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,None,dest))
+            self.binding_queue.append((e_id,None,None,source,None,None,None,None,None,None,None,dest))
         return
 
     def add_node_property_binding(self, resource, event_id, node, label,  value, ind):
@@ -1211,7 +1212,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         # Add to the set of edges between source <--> dest
         #self.graph_to_events[(source,dest)] = 
-        event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest),existing_set)[0]
+        event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest,label),existing_set)[0]
 
         #new_graph = Subgraph.merge(self.active_subgraphs[(source,)], self.active_subgraphs[(dest,)], event)
         #self.active_subgraphs[(source,dest)] = new_graph
