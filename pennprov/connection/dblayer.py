@@ -480,9 +480,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.add_node_binding(id, label, resource, node_identifier)
         return 1
 
-    def add_nodeprop(self, db, resource, node, label, value, ind=None):
-        # type: (cursor, str, str, str, Any, int) -> int
-        id = self.add_node_property_event(db, resource, label, value)
+    def add_nodeprop(self, db, resource, node, label, value, ind=None, parent_event=None):
+        # type: (cursor, str, str, str, Any, int, UUID) -> int
+        id = self.add_node_property_event(db, resource, label, value, parent_event)
         logging.debug('NodeProp: ' + node + ' ' + label + ': ' + str(value))
         if isinstance(value, str):
             return self._add_node_property_str_binding(resource, id, node, label,  value, ind)
@@ -757,6 +757,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def flush(self, db, resource):
         logging.warning('Flushed store')
         # type: (cursor, str) -> None
+        logging.info('Flushing event binding store')
         self._write_events(db)
         self._write_bindings(db)
         self.nodeprop_pool.clear()
@@ -818,14 +819,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
         self.event_queue.append((id, resource, 'E', label, None, None, None))
         return id
 
-    def add_node_property_event(self, db, resource, label, args, id=None):
-        # type: (cursor, str, str, str, UUID) -> UUID
+    def add_node_property_event(self, db, resource, label, args, id=None, parent_event=None):
+        # type: (cursor, str, str, str, UUID, UUID) -> UUID
         """
         Adds an event corresponding to a node property
         """
         if id == None:
             id = self.get_id_from_key(resource + ':' + label + '\\P')# + '\\N' + str(args))
-        self.event_queue.append((id, resource, 'P', label, None, None, None))#args))
+        self.event_queue.append((id, resource, 'P', label, None, parent_event, None))#args))
         return id
 
     def reset(self):
@@ -1179,7 +1180,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         logging.debug('* ADD PROP ' + node_id + "." + label + '=' + str(value))
         prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
-            self.active_subgraphs[(node_id,)].creation_event, None)
+            self.active_subgraphs[(node_id,)].get_event_expression_id(), None)
 
         # Update the node ID's subgraph to include the property events
         self.active_subgraphs[(node_id,)] = self.active_subgraphs[(node_id,)].add_event(\

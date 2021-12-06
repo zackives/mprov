@@ -49,12 +49,17 @@ class EventManager:
 
         # An event with children, find recursively
         if event == None:
+            logging.error('Unable to find event %s'%id)
             return result
         if event[2] == 'C' or event[2] == 'D':
+            logging.debug("Found composite event %s" %str(event))
             self.get_event_expression_from_id(db, resource, result, event[5])
             self.get_event_expression_from_id(db, resource, result, event[6])
+        elif event[2] == 'P':
+            logging.debug("Found property event %s" %str(event))
+            self.get_event_expression_from_id(db, resource, result, event[5])
         else:
-            logging.debug("Found event %s" %event)
+            logging.debug("Found event %s" %str(event))
             result.add(event)
 
         return result
@@ -70,37 +75,33 @@ class EventManager:
         """
 
         # A singleton set with the event tuple
-        result = {tuple,}
+        result = set()
 
         # Look up any items from the prior set (look up by its ID) and add
         # them to our set in the lattice
         if existing_event:
             result = self.get_event_expression_from_id(db, resource, result, \
                 existing_event)
+            logging.debug('Found prior event we are extending: %s: %s'%(str(existing_event), str(set(result))))
             
-        result = frozenset(result)
-        #logging.debug("Looking for match to %s"%(str(result)))
+        # Are we adding a node event, or a node property event?
+        uuid = None         # type: UUID
+        nuuid = None        # type: UUID
+
+        result = frozenset(result.union({tuple,}))
         if result not in self.inverse_events:
-            # Are we adding a node event, or a node property event?
-            uuid = None         # type: UUID
-            nuuid = None        # type: UUID
             if tuple[0] == 'N':
                 uuid = self.store.add_node_event(db, resource, tuple[1], '')
-                self.store.add_node_binding(uuid, tuple[1], resource, node_id)
-                logging.debug("Creating base node event: %s" %(str(uuid)))
+                logging.debug("Recording node event %s: %s" %(str(uuid),str(tuple[1])))
             else:
-                uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
-                logging.debug("Creating base property event: %s" %(str(uuid)))
-
-
-            nuuid = self._get_uuid()
+                uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2], None, existing_event)
+                logging.debug("Recording node property event: %s" %(str(uuid)))
+            nuuid = uuid#self._get_uuid()
             if existing_event:
-                existing_event_uuid = self.event_sets[existing_event]
-                uuid = self.store.add_compound_event(db, resource, existing_event_uuid, uuid)
-                #logging.debug("Creating compound event: %s" %(str(uuid)))
-                logging.debug("Extended (node-property) event: (e.%s/%s:%s)"%(nuuid,uuid,str(set(result))))
+                nuuid = self.store.add_compound_event(db, resource, existing_event, uuid)
+                logging.debug("Extending event: %s with %s" %(str(uuid),str(nuuid)))
             else:
-                logging.debug("Node event: (e.%s/%s:%s)"%(nuuid,uuid,str(set(result))))
+                logging.debug("Creating (node/property) event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
 
             self.inverse_events[result] = nuuid
             self.event_sets[nuuid] = uuid#result
@@ -139,7 +140,7 @@ class EventManager:
         uuid = self.store.add_edge_event(db, resource, tuple[1], tuple[2])
 
         if result not in self.inverse_events:
-            nuuid = self._get_uuid()
+            nuuid = uuid#self._get_uuid()
             logging.debug("Edge create event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
             self.inverse_events[result] = uuid
             self.event_sets[nuuid] = result
@@ -169,7 +170,7 @@ class EventManager:
 
         #self.graph_to_events[tuple(node_list)] = id
 
-        nuuid = self._get_id()
+        nuuid = id#self._get_id()
         self.event_sets[nuuid] = id
         # TODO:
         #self.inverse_events[result] = nuuid
