@@ -31,6 +31,7 @@ class MProvConnection:
     namespace = 'http://mprov.md2k.org'
     default_host = "localhost"
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
+    qualified_names = False
 
     #log = LogIndex()
     log = Factory.get_index() # type: ProvenanceStore
@@ -66,6 +67,8 @@ class MProvConnection:
         with self.graph_conn as conn:
             with conn.cursor() as cursor:
                 self.log.create_tables(cursor)
+
+        self.qualified_names = config.qualified_names
 
         self.graph_name = config.provenance.graph
         return
@@ -559,7 +562,10 @@ class MProvConnection:
         :param local_part:
         :return:
         """
-        return "{" + self.namespace + "}" + local_part
+        if self.qualified_names:
+            return "{" + self.namespace + "}" + local_part
+        else:
+            return local_part
 
     def get_token_qname(self, token):
         # types: (str) -> str
@@ -709,7 +715,8 @@ class MProvConnection:
         """
         match = cls.QNAME_REGEX.match(token_value)
         if not match:
-            raise ValueError('cannot parse as QualfiedName:', token_value)
+            return token_value
+            #raise ValueError('cannot parse as QualfiedName:', token_value)
         return match.group(2)
 
     def get_provenance_data(self, resource, token):

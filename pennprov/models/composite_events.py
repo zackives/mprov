@@ -79,7 +79,7 @@ class EventManager:
                 existing_event)
             
         result = frozenset(result)
-        logging.debug("Looking for match to %s"%(str(result)))
+        #logging.debug("Looking for match to %s"%(str(result)))
         if result not in self.inverse_events:
             # Are we adding a node event, or a node property event?
             uuid = None         # type: UUID
@@ -131,7 +131,6 @@ class EventManager:
             result = self.get_event_expression_from_id(db, resource, result, \
                 existing_event)
             result = result.union(set([tuple]))
-                #self.find_event_set(db, resource, existing_set))#self.event_sets[existing_set])
             
             result = frozenset(result)
         else:
@@ -170,7 +169,8 @@ class EventManager:
 
         #self.graph_to_events[tuple(node_list)] = id
 
-        self.event_sets[id] = id
+        nuuid = self._get_id()
+        self.event_sets[nuuid] = id
         # TODO:
         #self.inverse_events[result] = nuuid
 
@@ -180,5 +180,5 @@ class EventManager:
         logging.info('Merging subgraphs')
         self.store.flush(db, resource)
 
-        return
+        return nuuid
 

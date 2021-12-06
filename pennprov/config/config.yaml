@@ -11,3 +11,4 @@ provenance:
  password: YOUR_PASSWORD
  index: new # -> NewProvenanceStore. See pennprov/connection/dblayer.py for alternatives.
 
+qualified_names: False

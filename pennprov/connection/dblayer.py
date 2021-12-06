@@ -1177,7 +1177,7 @@ class NewProvenanceStore(ProvenanceStore):
         the node's event.  Updates the containing subgraph(s) with the new "root" event.
         """
 
-        logging.debug('* ADD PROP ' + node_id + "." + label + '=' + value)
+        logging.debug('* ADD PROP ' + node_id + "." + label + '=' + str(value))
         prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
             self.active_subgraphs[(node_id,)].creation_event, None)
 

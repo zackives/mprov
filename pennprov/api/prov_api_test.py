@@ -140,7 +140,7 @@ def test_graph():
     mprov_conn.add_to_collection(b,c)
     d = mprov_conn.store_agent('D')
     mprov_conn.add_to_collection(c,d)
-    e = mprov_conn.store_agent('E')
+    e = mprov_conn.store_activity('E',1,2)
     mprov_conn.add_to_collection(c,e)
     mprov_conn.add_to_collection(d,e)
 
