@@ -59,12 +59,12 @@ class EventManager:
 
         return result
 
-    def create_base_event(self, db, resource, tuple):
-        # type: (cursor, str, Tuple[Any]) -> str
-        return self.extend_event_set(db, resource, tuple, None)[0]
+    def create_base_event(self, db, resource, tuple, node_id):
+        # type: (cursor, str, Tuple[Any], str) -> str
+        return self.extend_event_set(db, resource, tuple, None, node_id)[0]
 
-    def extend_event_set(self, db, resource, tuple, existing_event):
-        # type: (str, str, Tuple[Any], UUID) -> Tuple[str,bool]
+    def extend_event_set(self, db, resource, tuple, existing_event, node_id):
+        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,bool]
         """
         Copy an event set node and add more items. This is done via composite events.
         """
@@ -78,18 +78,21 @@ class EventManager:
             result = self.get_event_expression_from_id(db, resource, result, \
                 existing_event)
             
-        # Are we adding a node event, or a node property event?
-        uuid = None         # type: UUID
-        nuuid = None        # type: UUID
-        if tuple[0] == 'N':
-            uuid = self.store.add_node_event(db, resource, tuple[1], '')
-            logging.debug("Creating base node event: %s" %(str(uuid)))
-        else:
-            uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
-            logging.debug("Creating base property event: %s" %(str(uuid)))
-
         result = frozenset(result)
+        logging.debug("Looking for match to %s"%(str(result)))
         if result not in self.inverse_events:
+            # Are we adding a node event, or a node property event?
+            uuid = None         # type: UUID
+            nuuid = None        # type: UUID
+            if tuple[0] == 'N':
+                uuid = self.store.add_node_event(db, resource, tuple[1], '')
+                self.store.add_node_binding(uuid, tuple[1], resource, node_id)
+                logging.debug("Creating base node event: %s" %(str(uuid)))
+            else:
+                uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2])
+                logging.debug("Creating base property event: %s" %(str(uuid)))
+
+
             nuuid = self._get_uuid()
             if existing_event:
                 existing_event_uuid = self.event_sets[existing_event]
@@ -106,8 +109,15 @@ class EventManager:
             self.store.flush(db, resource)
             return (nuuid,True)
         else:
-            # Reuse
             logging.debug("Node event %s reused: %s" %(self.inverse_events[result],str(set(result))))
+            if tuple[0] == 'N':
+                uuid = self.event_sets[self.inverse_events[result]]
+                self.store.add_node_binding(uuid, tuple[1], resource, node_id)
+                logging.debug("Binding to previous base node event: %s" %(str(uuid)))
+            else:
+                uuid = self.event_sets[self.inverse_events[result]]
+                logging.debug("Binding to previous base property event: %s" %(str(uuid)))
+            # Reuse
             return (self.inverse_events[result],False)
 
     def extend_event_set_edge(self, db, resource, tuple, existing_event):
@@ -167,6 +177,7 @@ class EventManager:
         # TODO: remove
         #self.flush(db, resource)
         #self._write_dirty_nodes(db, resource)
+        logging.info('Merging subgraphs')
         self.store.flush(db, resource)
 
         return

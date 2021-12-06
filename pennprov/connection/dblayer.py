@@ -1159,8 +1159,8 @@ class NewProvenanceStore(ProvenanceStore):
         """
 
         if node_id not in self.graph_nodes:
-            logging.debug('* ADD NODE ' + node_id)
-            node_create_event = self.event_sets.create_base_event(db, resource, ('N',label))
+            logging.debug('* ADD NODE ' + node_id + "/" + label)
+            node_create_event = self.event_sets.create_base_event(db, resource, ('N',label), node_id)
             
             ## TODO: deprecate?
             self.graph_nodes.append(node_id)
@@ -1179,7 +1179,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         logging.debug('* ADD PROP ' + node_id + "." + label + '=' + value)
         prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
-            self.active_subgraphs[(node_id,)].creation_event)
+            self.active_subgraphs[(node_id,)].creation_event, None)
 
         # Update the node ID's subgraph to include the property events
         self.active_subgraphs[(node_id,)] = self.active_subgraphs[(node_id,)].add_event(\
