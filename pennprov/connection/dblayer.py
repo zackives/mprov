@@ -415,17 +415,19 @@ class EventBindingProvenanceStore(ProvenanceStore):
             self.binding_queue.append((id,None,None,source,None,None,None,None,None,None,None,dest))
         return
 
-    def add_node_property_binding(self, resource, id, node, label,  value, ind):
+    def add_node_property_binding(self, resource, event_id, node, label,  value, ind):
         # type: (str, str, str, str, str, Any) -> None
 
+        logging.debug("ADDPROP: %s %s %s %s" %(str(event_id),str(node),label,str(value)))
+
         if isinstance(value, str):
-            return self._add_node_property_str_binding(resource, id, node, label, value, ind)
+            return self._add_node_property_str_binding(resource, event_id, node, label, value, ind)
         elif isinstance(value, int):
-            return self._add_node_property_int_binding(resource, id, node, label, value, ind)
+            return self._add_node_property_int_binding(resource, event_id, node, label, value, ind)
         elif isinstance(value, float):
-            return self._add_node_property_float_binding(resource, id, node, label, value, ind)
-        elif isinstance(value, datetime):
-            return self._add_node_property_datetime_binding(resource, id, node, label, value, ind)
+            return self._add_node_property_float_binding(resource, event_id, node, label, value, ind)
+        elif isinstance(value, datetime.datetime):
+            return self._add_node_property_datetime_binding(resource, event_id, node, label, value, ind)
         else:
             raise ValueError()
 
@@ -1160,7 +1162,7 @@ class NewProvenanceStore(ProvenanceStore):
         """
 
         if node_id not in self.graph_nodes:
-            logging.debug('* ADD NODE ' + node_id + "/" + label)
+            logging.debug('* ADD NODE ' + label + "(" + node_id + ")")
             node_create_event = self.event_sets.create_base_event(db, resource, ('N',label), node_id)
             
             ## TODO: deprecate?
@@ -1180,7 +1182,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         logging.debug('* ADD PROP ' + node_id + "." + label + '=' + str(value))
         prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
-            self.active_subgraphs[(node_id,)].get_event_expression_id(), None)
+            self.active_subgraphs[(node_id,)].get_event_expression_id(), node_id)
 
         # Update the node ID's subgraph to include the property events
         self.active_subgraphs[(node_id,)] = self.active_subgraphs[(node_id,)].add_event(\

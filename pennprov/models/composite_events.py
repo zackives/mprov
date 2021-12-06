@@ -92,16 +92,18 @@ class EventManager:
         if result not in self.inverse_events:
             if tuple[0] == 'N':
                 uuid = self.store.add_node_event(db, resource, tuple[1], '')
-                logging.debug("Recording node event %s: %s" %(str(uuid),str(tuple[1])))
+                self.store.add_node_binding(uuid, tuple[1], resource, node_id)
+                #logging.debug("Recording node event %s: %s" %(str(uuid),str(tuple[1])))
             else:
                 uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2], None, existing_event)
-                logging.debug("Recording node property event: %s" %(str(uuid)))
+                self.store.add_node_property_binding(resource, uuid, node_id, tuple[1], tuple[2], None)
+                #logging.debug("Recording node property event: %s" %(str(uuid)))
             nuuid = uuid#self._get_uuid()
             if existing_event:
                 nuuid = self.store.add_compound_event(db, resource, existing_event, uuid)
-                logging.debug("Extending event: %s with %s" %(str(uuid),str(nuuid)))
+                logging.debug("Extending to compound event: (e.%s -> %s)" %(str(nuuid),str(uuid)))
             else:
-                logging.debug("Creating (node/property) event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
+                logging.debug("Creating (node/property) event: (%s:%s)"%(uuid,str(set(result))))
 
             self.inverse_events[result] = nuuid
             self.event_sets[nuuid] = uuid#result
@@ -110,13 +112,14 @@ class EventManager:
             self.store.flush(db, resource)
             return (nuuid,True)
         else:
-            logging.debug("Node event %s reused: %s" %(self.inverse_events[result],str(set(result))))
+            logging.debug("Node-property event %s reused: %s" %(self.inverse_events[result],str(set(result))))
             if tuple[0] == 'N':
                 uuid = self.event_sets[self.inverse_events[result]]
                 self.store.add_node_binding(uuid, tuple[1], resource, node_id)
                 logging.debug("Binding to previous base node event: %s" %(str(uuid)))
             else:
                 uuid = self.event_sets[self.inverse_events[result]]
+                self.store.add_node_property_binding(resource, uuid, node_id, tuple[1], tuple[2], None)
                 logging.debug("Binding to previous base property event: %s" %(str(uuid)))
             # Reuse
             return (self.inverse_events[result],False)
