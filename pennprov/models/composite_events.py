@@ -45,6 +45,19 @@ class EventManager:
         leading to the recursive case.
         """
 
+        event = self.get_event_expression_from_id_2(db, resource, result, id)
+        logging.debug("Event %s: %s" %(str(id),str(result)))
+
+        return result
+
+    def get_event_expression_from_id_2(self, db, resource, result, id):
+        #result = set.union(result, self.event_sets[id])
+        """
+        Given an eventset UUID, find all associated events.  May require transitive closure
+        if there are composite events.  The "C" and "D" composite events reference child events,
+        leading to the recursive case.
+        """
+
         event = self.store.get_event(db, resource, id)
 
         # An event with children, find recursively
@@ -52,14 +65,14 @@ class EventManager:
             logging.error('Unable to find event %s'%id)
             return result
         if event[2] == 'C' or event[2] == 'D':
-            logging.debug("Found composite event %s" %str(event))
-            self.get_event_expression_from_id(db, resource, result, event[5])
-            self.get_event_expression_from_id(db, resource, result, event[6])
+            #logging.debug("Found composite event %s" %str(event))
+            self.get_event_expression_from_id_2(db, resource, result, event[5])
+            self.get_event_expression_from_id_2(db, resource, result, event[6])
         elif event[2] == 'P':
-            logging.debug("Found property event %s" %str(event))
-            self.get_event_expression_from_id(db, resource, result, event[5])
+            #logging.debug("Found property event %s" %str(event))
+            self.get_event_expression_from_id_2(db, resource, result, event[5])
         else:
-            logging.debug("Found event %s" %str(event))
+            #logging.debug("Found event %s" %str(event))
             result.add(event)
 
         return result
@@ -183,7 +196,7 @@ class EventManager:
         # TODO: remove
         #self.flush(db, resource)
         #self._write_dirty_nodes(db, resource)
-        logging.info('Merging subgraphs')
+        logging.info('Merging subgraphs [NOT YET IMPLEMENTED?]')
         self.store.flush(db, resource)
 
         return nuuid

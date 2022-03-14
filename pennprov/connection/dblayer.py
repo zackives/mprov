@@ -758,9 +758,9 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return ret_list
 
     def flush(self, db, resource):
-        logging.warning('Flushed store')
+        logging.warning('Flushing event binding store')
         # type: (cursor, str) -> None
-        logging.info('Flushing event binding store')
+        #logging.info('Flushing event binding store')
         self._write_events(db)
         self._write_bindings(db)
         self.nodeprop_pool.clear()
@@ -1287,16 +1287,7 @@ class NewProvenanceStore(ProvenanceStore):
             new_graph.add_external_edges(db, resource, source)
 
         #logging.debug(str(self.internal_edges))
-        if source in new_graph.get_internal_edges():
-            logging.debug("--> Adding internal edge %s"%str((label,dest,)))
-            new_graph.internal_edges[source].append((label,dest))
-            # self._get_graph_connected(source)
-            # self._get_graph_connected(dest)
-        else:
-            logging.debug("--> Setting  internal edge %s -> %s"%(source,str((label,dest,))))
-            new_graph.internal_edges[source] = [(label,dest)]
-            # self._get_graph_connected(source)
-            # self._get_graph_connected(dest)
+        new_graph.add_internal_edge(source, label, dest)
 
         if existing_set == None:#len(existing_set) == 0:
             # These are the events for left
