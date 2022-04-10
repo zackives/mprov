@@ -49,7 +49,7 @@ class EventManager:
 
         # An event with children, find recursively
         if event == None:
-            logging.error('Unable to find event %s'%id)
+            logging.debug('Unable to find event %s'%id)
             return result
         if event[2] == 'C' or event[2] == 'D':
             logging.debug("Found composite event %s" %str(event))
@@ -93,11 +93,11 @@ class EventManager:
             if tuple[0] == 'N':
                 uuid = self.store.add_node_event(db, resource, tuple[1], '')
                 self.store.add_node_binding(uuid, tuple[1], resource, node_id)
-                #logging.debug("Recording node event %s: %s" %(str(uuid),str(tuple[1])))
+                logging.debug("Recording node event %s: %s" %(str(uuid),str(tuple[1])))
             else:
                 uuid = self.store.add_node_property_event(db, resource, tuple[1], tuple[2], None, existing_event)
                 self.store.add_node_property_binding(resource, uuid, node_id, tuple[1], tuple[2], None)
-                #logging.debug("Recording node property event: %s" %(str(uuid)))
+                logging.debug("Recording node property event: %s" %(str(uuid)))
             nuuid = uuid#self._get_uuid()
             if existing_event:
                 nuuid = self.store.add_compound_event(db, resource, existing_event, uuid)

@@ -419,7 +419,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
     def add_node_property_binding(self, resource, event_id, node, label,  value, ind):
         # type: (str, str, str, str, str, Any) -> None
 
-        logging.debug("ADDPROP: %s %s %s %s" %(str(event_id),str(node),label,str(value)))
+        logging.debug("Storing property binding to table: %s %s %s %s" %(str(event_id),str(node),label,str(value)))
 
         if isinstance(value, str):
             return self._add_node_property_str_binding(resource, event_id, node, label, value, ind)
@@ -758,7 +758,7 @@ class EventBindingProvenanceStore(ProvenanceStore):
         return ret_list
 
     def flush(self, db, resource):
-        logging.warning('Flushed store')
+        #logging.warning('Flushed store')
         # type: (cursor, str) -> None
         logging.info('Flushing event binding store')
         self._write_events(db)
