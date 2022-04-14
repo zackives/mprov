@@ -153,7 +153,7 @@ class EventManager:
         else:
             result = frozenset([tuple])
 
-        logging.debug('Extend Edge Tuple %s'%str(tuple))
+        logging.debug('Extend edge %s'%str(tuple))
         uuid = self.store.add_edge_event(db, resource, tuple[3], tuple[2])
         self.store.add_edge_binding(uuid, resource, tuple[1], tuple[3], tuple[2])
 
@@ -196,7 +196,7 @@ class EventManager:
         # TODO: remove
         #self.flush(db, resource)
         #self._write_dirty_nodes(db, resource)
-        logging.info('Merging subgraphs [NOT YET IMPLEMENTED?]')
+        logging.info('Merging subgraphs [IS THIS NEEDED AFTER SUBGRAPH MERGE?]')
         self.store.flush(db, resource)
 
         return nuuid
