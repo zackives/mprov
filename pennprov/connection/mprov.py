@@ -33,6 +33,9 @@ class MProvConnection:
     QNAME_REGEX = re.compile('{([^}]*)}(.*)')
     qualified_names = False
 
+    graph_conn = None
+    auth_conn = None
+
     #log = LogIndex()
     log = Factory.get_index() # type: ProvenanceStore
     #log = CompressingLogIndex()

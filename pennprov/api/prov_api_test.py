@@ -130,7 +130,23 @@ def x_test_at_scale():
     mprov_conn.get_dot("test_at_scale.dot")
     print('Finished after %s' %(datetime.now()-start))
 
-def test_graph():
+def test_graph_flat():
+    #mprov_conn.create_or_reset_graph()
+    start = datetime.now()
+    a = mprov_conn.store_agent('A')
+
+    b = mprov_conn.store_agent('B')
+    mprov_conn.add_to_collection(a,b)
+    c = mprov_conn.store_agent('C')
+    mprov_conn.add_to_collection(a,c)
+
+    for i in range(1,5):
+        d = mprov_conn.store_agent('D')
+        mprov_conn.add_to_collection(a,d)
+        e = mprov_conn.store_activity('E',i,i+1)
+        mprov_conn.add_to_collection(d,e)
+
+def x_test_graph():
     #mprov_conn.create_or_reset_graph()
     start = datetime.now()
     a = mprov_conn.store_agent('A')
