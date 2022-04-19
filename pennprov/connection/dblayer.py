@@ -1154,6 +1154,12 @@ class NewProvenanceStore(ProvenanceStore):
     #     (2) how do we effectively merge subgraphs while separating
     #         bindings, and passing recursively to subgraphs?
 
+    def get_subgraph_and_binding(self, db, resource, label, subgraph_id):
+        # TODO: look up subgraph ID by binding. Get event expression and node expression.
+        
+        #self.event_sets.get_event_expression_from_id(event_id)
+        return
+
     def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
 
