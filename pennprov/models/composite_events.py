@@ -53,29 +53,54 @@ class EventManager:
             return result
         if event[2] == 'C' or event[2] == 'D':
             logging.debug("Found composite event %s" %str(event))
-            self.get_event_expression_from_id(db, resource, result, event[5])
-            self.get_event_expression_from_id(db, resource, result, event[6])
+            self._get_event_expression_from_id(db, resource, result, event[5])
+            self._get_event_expression_from_id(db, resource, result, event[6])
         elif event[2] == 'P':
             logging.debug("Found property event %s" %str(event))
-            self.get_event_expression_from_id(db, resource, result, event[5])
+            self._get_event_expression_from_id(db, resource, result, event[5])
         else:
             logging.debug("Found event %s" %str(event))
             result.add(event)
 
         return result
 
+    def _get_event_expression_from_id(self, db, resource, result, id):
+        #result = set.union(result, self.event_sets[id])
+        """
+        Given an eventset UUID, find all associated events.  May require transitive closure
+        if there are composite events.  The "C" and "D" composite events reference child events,
+        leading to the recursive case.
+        """
+
+        event = self.store.get_event(db, resource, id)
+
+        # An event with children, find recursively
+        if event == None:
+            return result
+        if event[2] == 'C' or event[2] == 'D':
+            self._get_event_expression_from_id(db, resource, result, event[5])
+            self._get_event_expression_from_id(db, resource, result, event[6])
+        elif event[2] == 'P':
+            self._get_event_expression_from_id(db, resource, result, event[5])
+        else:
+            result.add(event)
+
+        return result
+
     def create_base_event(self, db, resource, tuple, node_id):
-        # type: (cursor, str, Tuple[Any], str) -> str
-        return self.extend_event_set(db, resource, tuple, None, node_id)[0]
+        # type: (cursor, str, Tuple[Any], str) -> Tuple[str,list]
+        return self.extend_event_set(db, resource, tuple, None, node_id)[0:-1]
 
     def extend_event_set(self, db, resource, tuple, existing_event, node_id):
-        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,bool]
+        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,list,bool]
         """
         Copy an event set node and add more items. This is done via composite events.
         """
 
         # A singleton set with the event tuple
         result = set()
+
+        binding = []
 
         # Look up any items from the prior set (look up by its ID) and add
         # them to our set in the lattice
@@ -110,22 +135,26 @@ class EventManager:
 
             # Temporary
             self.store.flush(db, resource)
-            return (nuuid,True)
+            return (nuuid,binding,True)
         else:
             logging.debug("Node-property event %s reused: %s" %(self.inverse_events[result],str(set(result))))
             if tuple[0] == 'N':
                 uuid = self.event_sets[self.inverse_events[result]]
                 self.store.add_node_binding(uuid, tuple[1], resource, node_id)
                 logging.debug("Binding to previous base node event: %s" %(str(uuid)))
-            else:
+            elif tuple[0] == 'P':
                 uuid = self.event_sets[self.inverse_events[result]]
                 self.store.add_node_property_binding(resource, uuid, node_id, tuple[1], tuple[2], None)
                 logging.debug("Binding to previous base property event: %s" %(str(uuid)))
+            else:
+                uuid = self.event_sets[self.inverse_events[result]]
+                self.store.add_node_property_binding(resource, uuid, node_id, tuple[1], tuple[2], None)
+                logging.debug("Binding to previous base composite(!) event: %s" %(str(uuid)))
             # Reuse
-            return (self.inverse_events[result],False)
+            return (self.inverse_events[result],binding,False)
 
     def extend_event_set_edge(self, db, resource, tuple, existing_event):
-        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,bool]
+        # type: (str, str, Tuple[Any], UUID, str) -> Tuple[str,list,bool]
         """
         Copy an event set node and add more items
         """
@@ -143,15 +172,16 @@ class EventManager:
         logging.debug('Extend Edge Tuple %s'%str(tuple))
         uuid = self.store.add_edge_event(db, resource, tuple[3], tuple[2])
         self.store.add_edge_binding(uuid, resource, tuple[1], tuple[3], tuple[2])
+        binding = []
 
         if result not in self.inverse_events:
             nuuid = uuid#self._get_uuid()
             logging.debug("Edge create event: (%s,%s:%s)"%(nuuid,uuid,str(set(result))))
             self.inverse_events[result] = uuid
             self.event_sets[nuuid] = result
-            return (nuuid,True)
+            return (nuuid,binding,True)
         else:
-            return (self.inverse_events[result],True)
+            return (self.inverse_events[result],binding,True)
 
     def _get_id(self):
         # type: () -> UUID
