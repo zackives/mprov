@@ -30,14 +30,20 @@ class Subgraph:
 
     written = False
 
-    def __init__(self, initial_nodeset, emgr, creation_event):
-        # type: (Set[UUID], EventManager, UUID) -> None
+    def __init__(self, initial_nodeset, emgr, creation_event, opt_internal_edges=None, opt_external_edges=None):
+        # type: (Set[UUID], EventManager, UUID, list[Dict], list[Tuple]) -> None
         self.node_set = frozenset(initial_nodeset)
         self.node_mapping = list(initial_nodeset)
         self.event_manager = emgr
         self.creation_event = creation_event
-        self.internal_edges = {}
-        self.external_edges = []
+        if opt_internal_edges:
+            self.internal_edges = opt_internal_edges
+        else:
+            self.internal_edges = {}
+        if opt_external_edges:
+            self.external_edges = opt_external_edges
+        else:
+            self.external_edges = []
         self.node_to_event_tree = {}
         self.written = False
         for node in initial_nodeset:
@@ -75,6 +81,8 @@ class Subgraph:
         """
         self.creation_event = new_event # Update this to be our "root" event
 
+        logging.debug("<< Adding subgraph event %s"%str(new_event))
+
         # If this subgraph is within a parent graph, bubble the update upwards
         if self.parent:
             self.parent.add_event(new_event)
@@ -94,6 +102,18 @@ class Subgraph:
         for (dest,label) in self.store.get_connected_to(db, resource, node_id, None):
             self.external_edges.append((node_id,label,dest))
         return
+
+    def add_internal_edge(self, source, label, dest):
+        if source in self.get_internal_edges():
+            logging.debug("--> Adding internal edge %s"%str((label,dest,)))
+            self.internal_edges[source].append((label,dest))
+            # self._get_graph_connected(source)
+            # self._get_graph_connected(dest)
+        else:
+            logging.debug("--> Setting  internal edge %s -> %s"%(source,str((label,dest,))))
+            self.internal_edges[source] = [(label,dest)]
+            # self._get_graph_connected(source)
+            # self._get_graph_connected(dest)
 
     def get_connected_nodes(self,node):
         # type: (str) -> List[str]
@@ -225,4 +245,4 @@ class Subgraph:
         return sum([1 if n in self.node_set else 0 for n in nodes]) == len(nodes)
 
     def __str__(self):
-        return str(self.creation_event) + ':' + set(self.node_set).__str__().replace('{http://mprov.md2k.org}','')
+        return str(self.creation_event) + ':' + set(self.node_set).__str__().replace('{http://mprov.md2k.org}','') + "; " + str(self.internal_edges)
