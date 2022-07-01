@@ -21,61 +21,67 @@ class Op(Enum):
 class Cmd:
     op = None            # type: Op
     args = None          # Type: List[None]
+    id = None
 
     def __init__(self, op, args):
         # type: (Op, List[Any]) -> None
         self.op = op
         self.args = args
+        self.id = GraphScript.get_id()
+        print(op)
+
+    def get_id(self):
+        return self.id
 
 class PushCmd(Cmd):
     def __init__(self, arg):
         # type: (UUID|str) -> None
-        super.__init__(Op.PUSH, [arg])
+        Cmd.__init__(self, Op.PUSH, [arg])
 
 class SetCmd(Cmd):
     def __init__(self, arg, pos):
         # type: (UUID|str, int) -> None
-        super.__init__(Op.SET, [arg, pos])
+        Cmd.__init__(self, Op.SET, [arg, pos])
 
 class PopCmd(Cmd):
     def __init__(self):
         # type: () -> None
-        super.__init__(Op.POP, [])
+        Cmd.__init__(self, Op.POP, [])
 
 class DelCmd(Cmd):
     def __init__(self, pos):
         # type: (int) -> None
-        super.__init__(Op.DEL, [pos])
+        Cmd.__init__(self, Op.DEL, [pos])
 
 class XchCmd(Cmd):
     def __init__(self, pos1, pos2):
         # type: (int, int) -> None
-        super.__init__(Op.XCH, [pos1, pos2])
+        Cmd.__init__(self, Op.XCH, [pos1, pos2])
 
 class NodeCmd(Cmd):
     def __init__(self, idinx, labinx):
         # type: (int, int) -> None
-        super.__init__(Op.NODE, [idinx, labinx])
+        Cmd.__init__(self, Op.NODE, [idinx, labinx])
 
 class NodeLabCmd(Cmd):
     def __init__(self, idinx, label):
         # type: (int, str) -> None
-        super.__init__(Op.NODE_LAB, [idinx, label])
+        Cmd.__init__(self, Op.NODE_LAB, [idinx, label])
 
 class EdgeCmd(Cmd):
     def __init__(self, frominx, labinx, toinx):
         # type: (int, int, int) -> None
-        super.__init__(Op.EDGE, [frominx, labinx, toinx])
+        Cmd.__init__(self, Op.EDGE, [frominx, labinx, toinx])
 
 class EdgeLabCmd(Cmd):
     def __init__(self, frominx, label, toinx):
         # type: (int, str, int) -> None
-        super.__init__(Op.EDGE_LAB, [frominx, label, toinx])
+        Cmd.__init__(self, Op.EDGE_LAB, [frominx, label, toinx])
 
 class CatCmd(Cmd):
     def __init__(self, left_interval, right_interval):
         # type: (int, List[Any], List[Any]) -> None
-        super.__init__(Op.CONCAT, [left_interval, right_interval])
+        Cmd.__init__(self, Op.CONCAT, [left_interval, right_interval])
 
 class GraphScript:
     # Bounded LRU queue, from ordering -> hash
@@ -104,7 +110,7 @@ class GraphScript:
 
     def append_command(self, cmd):
         # type: (Cmd) -> UUID
-        id = GraphScript.get_id_from_key(cmd)
+        id = cmd.get_id()
         self.cmd_list.append(id)
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
@@ -114,13 +120,13 @@ class GraphScript:
         return id
 
     ## Find a binding in the working set, and return its index if it's there
-    def add_or_lookup(self, id):
+    def add_or_lookup(self, the_id):
         # type: (UUID) -> int
-        inx = self.working_set.index(id)
-        if inx < 0:
-            self.working_set.append(id)
+        if the_id not in self.working_set:
+            self.working_set.append(the_id)
             return (len(self.working_set) - 1, False)
         else:
+            inx = self.working_set.index(the_id)
             return (inx, True)
 
     def reuse_command_by_index(self, inx_pos):
@@ -140,7 +146,7 @@ class GraphScript:
         # type: (ProvenanceStore, int, int) -> None
         pass
 
-    def add_node(self, id, label):
+    def add_node(self, id, label, values):
         binding,is_reused = self.add_or_lookup(id)
 
         if not is_reused:
@@ -155,6 +161,9 @@ class GraphScript:
 
         return node_cmd
 
+    def add_edge(self, source, label, dest, values):
+        return
+
 class ProvenanceScript(ProvenanceStore):
     script = GraphScript()
     sub_store = None
@@ -166,12 +175,14 @@ class ProvenanceScript(ProvenanceStore):
     
     def add_node(self, db, resource, label, skolem_args):
         # type: (cursor, str, str, str) -> None
-        self.script.add_node(id, skolem_args[0])
+        the_id = GraphScript.get_id()
+        self.script.add_node(the_id, label, skolem_args)
         return 1
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> None
-       return 1
+        self.script.add_edge(source, label, dest, [])
+        return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> None
