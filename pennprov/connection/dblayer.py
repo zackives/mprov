@@ -1154,6 +1154,12 @@ class NewProvenanceStore(ProvenanceStore):
     #     (2) how do we effectively merge subgraphs while separating
     #         bindings, and passing recursively to subgraphs?
 
+    def get_subgraph_and_binding(self, db, resource, label, subgraph_id):
+        # TODO: look up subgraph ID by binding. Get event expression and node expression.
+        
+        #self.event_sets.get_event_expression_from_id(event_id)
+        return
+
     def add_node(self, db, resource, label, node_id):
         # type: (cursor, str, str, str) -> int
 
@@ -1164,7 +1170,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         if node_id not in self.graph_nodes:
             logging.debug('* ADD NODE ' + label + "(" + node_id + ")")
-            node_create_event = self.event_sets.create_base_event(db, resource, ('N',label), node_id)
+            (node_create_event,node_binding) = self.event_sets.create_base_event(db, resource, ('N',label), node_id)
             
             ## TODO: deprecate?
             self.graph_nodes.append(node_id)
@@ -1182,7 +1188,7 @@ class NewProvenanceStore(ProvenanceStore):
         """
 
         logging.debug('* ADD PROP ' + node_id + "." + label + '=' + str(value))
-        prop_event, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
+        prop_event,binding, _ = self.event_sets.extend_event_set(db, resource, ('P',label,value), \
             self.active_subgraphs[(node_id,)].get_event_expression_id(), node_id)
 
         # Update the node ID's subgraph to include the property events
@@ -1212,7 +1218,7 @@ class NewProvenanceStore(ProvenanceStore):
 
         # Add to the set of edges between source <--> dest
         #self.graph_to_events[(source,dest)] = 
-        event = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest,label),existing_set)[0]
+        event,binding = self.event_sets.extend_event_set_edge(db, resource, ('E',source,dest,label),existing_set)[0:-1]
 
         #new_graph = Subgraph.merge(self.active_subgraphs[(source,)], self.active_subgraphs[(dest,)], event)
         #self.active_subgraphs[(source,dest)] = new_graph
