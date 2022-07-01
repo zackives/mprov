@@ -1,7 +1,10 @@
+from doctest import script_from_examples
 from enum import Enum
 from typing import List, Any, Mapping
 import uuid
 from uuid import UUID
+
+from pennprov.connection.provenance_store import ProvenanceStore
 
 class Op(Enum):
     PUSH = 0
@@ -69,12 +72,22 @@ class EdgeLabCmd(Cmd):
         # type: (int, str, int) -> None
         super.__init__(Op.EDGE_LAB, [frominx, label, toinx])
 
+class CatCmd(Cmd):
+    def __init__(self, left_interval, right_interval):
+        # type: (int, List[Any], List[Any]) -> None
+        super.__init__(Op.CONCAT, [left_interval, right_interval])
+
 class GraphScript:
-    # Bounded LRU queue
+    # Bounded LRU queue, from ordering -> hash
     cmd_list = []           # type: List[UUID]
+    # Hash --> command
     cmd_hash = []           # type: Mapping[UUID,Cmd]
 
-    max = 1024
+    working_set = []        # type: List[UUID]
+
+    # Should it be a list of lists? a tree?
+
+    MAX = 1024
 
     def get_id():
         # type: () -> UUID
@@ -100,12 +113,140 @@ class GraphScript:
 
         return id
 
-    def reuse_command(self, inx_pos):
-        pass
+    ## Find a binding in the working set, and return its index if it's there
+    def add_or_lookup(self, id):
+        # type: (UUID) -> int
+        inx = self.working_set.index(id)
+        if inx < 0:
+            self.working_set.append(id)
+            return (len(self.working_set) - 1, False)
+        else:
+            return (inx, True)
 
-    def discard_command(self, inx_pos):
-        pass
+    def reuse_command_by_index(self, inx_pos):
+        # type: (int) -> UUID
+        hash  = self.cmd_list[inx_pos]
+        self.cmd_list.remove(hash)
+        self.cmd_list.append(hash)
+        return hash
 
+    def discard_command_by_index(self, inx_pos):
+        # type: (int) -> None
+        hash  = self.cmd_list[inx_pos]
+        self.cmd_list.remove(hash)
+        del self.cmd_hash[hash]
 
     def apply_script(self, target, start=0, end=-1):
+        # type: (ProvenanceStore, int, int) -> None
         pass
+
+    def add_node(self, id, label):
+        binding,is_reused = self.add_or_lookup(id)
+
+        if not is_reused:
+            bind_cmd = self.append_command(PushCmd(id))
+            node_cmd = self.append_command(NodeLabCmd(bind_cmd, label))
+            batch_cmd = self.append_command(CatCmd([bind_cmd], [node_cmd]))
+        else:
+            # TODO
+            #bind_cmd = self.reuse_command(PushCmd(id))
+            #node_cmd = self.append_command(NodeLabCmd(bind_cmd, label))
+            pass
+
+        return node_cmd
+
+class ProvenanceScript(ProvenanceStore):
+    script = GraphScript()
+    sub_store = None
+
+    def __init__(self, sub_store):
+        # type: (ProvenanceStore) -> None
+        self.sub_store = sub_store
+
+    
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, str) -> None
+        self.script.add_node(id, skolem_args[0])
+        return 1
+
+    def add_edge(self, db, resource, source, label, dest):
+        # type: (cursor, str, str, str, str) -> None
+       return 1
+
+    def add_nodeprop(self, db, resource, node, label, value, ind=None):
+        # type: (cursor, str, str, str, Any, int) -> None
+        return 1
+
+    def flush(self, db, resource):
+        self.sub_store.flush(db, resource)
+        return
+
+    def reset(self):
+        self.sub_store.reset()
+        return
+
+    def create_tables(self, cursor):
+        # type: (cursor) -> None
+        self.sub_store.create_tables(cursor)
+
+    def clear_tables(self, db, graph):
+        # type: (cursor, str) -> None
+        self.sub_store.clear_tables(db, graph)
+
+    def get_provenance_data(self, db, resource, token):
+        # type: (cursor, str, str) -> List[Dict]
+        return
+
+    def get_connected_to(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[str]
+        return
+
+    def get_connected_from(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[str]
+        return
+
+    def get_connected_to_labeled(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        return
+
+    def get_connected_from_labeled(self, db, resource, token, label1):
+        # type: (cursor, str, str, str) -> List[Tuple(str,str)]
+        return
+
+    def get_edges(self, db, resource):
+        #type: (cursor, str) -> List[Tuple]
+        return []
+
+    def get_nodes(self, db, resource):
+        #type: (cursor, str) -> List[Dict]
+        return []
+
+
+
+######################## Simple Test Script #######################
+
+
+def write_motif(db, store, prog1_source, input_common, offset):
+    input1 = store.add_node(db, "mprov", "entity", ['stream1', 1+offset,3+offset,'x'])
+    input2 = store.add_node(db, "mprov", "entity", ['stream2', 2+offset,4+offset,'y'])
+    prog1_exec1 = store.add_node(db, "mprov", 'activity', ['prog1','7-1-2022'])
+    output1 = store.add_node(db, "mprov", "entity", ['stream3', 3+offset,5+offset,'z'])
+    edge1 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input1)
+    edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input2)
+    edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input_common)
+    edge3 = store.add_edge(db, 'mprov', output1, 'wasGeneratedBy', prog1_exec1)
+    edge4 = store.add_edge(db, 'mprov', prog1_exec1, 'used', prog1_source)
+    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input1)
+    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input2)
+    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input_common)
+
+def simple_test(db, store):
+    # These nodes are used across multiple motifs
+    input_common = store.add_node(db, "mprov", "entity", ['file1'])
+    prog1_source = store.add_node(db, 'mprov', 'entity', ['prog1.c', '1-1-1980'])
+
+    write_motif(db, store, prog1_source, input_common, 1)
+    write_motif(db, store, prog1_source, input_common, 2)
+    write_motif(db, store, prog1_source, input_common, 3)
+
+simple_test(None, ProvenanceScript(ProvenanceStore()))

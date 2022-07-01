@@ -1,6 +1,8 @@
 import os
 from pennprov.config import config
 
+import logging
+
 from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
 
 import uuid
@@ -39,21 +41,25 @@ class ProvenanceStore:
     Factory.register_index_type('no-op', lambda: ProvenanceStore())
 
     def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> None
+        # type: (cursor, str, str, List[Any]) -> None
+        logging.info('Node ' + str(label) + str(skolem_args))
         return 1
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> None
-       return 1
+        logging.info('Edge ' + str(source) + str(label) + str(dest))
+        return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> None
         return 1
 
     def flush(self, db, resource):
+        logging.info('Flush')
         return
 
     def reset(self):
+        logging.info('Reset')
         return
 
     def create_tables(self, cursor):
