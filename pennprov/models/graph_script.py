@@ -1,6 +1,6 @@
 from doctest import script_from_examples
 from enum import Enum
-from typing import List, Any, Mapping
+from typing import List, Any, Mapping, Tuple
 import uuid
 from uuid import UUID
 
@@ -17,7 +17,8 @@ class Op(Enum):
     EDGE = 20
     EDGE_LAB = 21
     CONCAT = 30
-    REF = 31
+    CONCAT3 = 31
+    REF = 32
 
 class Cmd:
     op = None            # type: Op
@@ -80,17 +81,22 @@ class NodeLabCmd(Cmd):
 class EdgeCmd(Cmd):
     def __init__(self, frominx, labinx, toinx):
         # type: (int, int, int) -> None
-        Cmd.__init__(self, Op.EDGE, [frominx, labinx, toinx])
+        Cmd.__init__(self, Op.EDGE, [frominx, labinx, toinx], GraphScript.get_id_from_key(str((frominx, toinx))))
 
 class EdgeLabCmd(Cmd):
     def __init__(self, frominx, label, toinx):
         # type: (int, str, int) -> None
-        Cmd.__init__(self, Op.EDGE_LAB, [frominx, label, toinx])
+        Cmd.__init__(self, Op.EDGE_LAB, [frominx, label, toinx], GraphScript.get_id_from_key(str((frominx, label,toinx))))
 
 class CatCmd(Cmd):
     def __init__(self, left_interval, right_interval):
         # type: (int, List[Any], List[Any]) -> None
-        Cmd.__init__(self, Op.CONCAT, [left_interval, right_interval])
+        Cmd.__init__(self, Op.CONCAT, [left_interval, right_interval], GraphScript.get_id())
+
+class Cat3Cmd(Cmd):
+    def __init__(self, left_interval, mid_interval, right_interval):
+        # type: (int, List[Any], List[Any]) -> None
+        Cmd.__init__(self, Op.CONCAT, [left_interval, mid_interval, right_interval], GraphScript.get_id())
 
 class RefCmd(Cmd):
     def __init__(self, prev_cmd):
@@ -122,18 +128,18 @@ class GraphScript:
         if len(self.cmd_list) > self.MAX:
             pass
 
-    def append_command(self, cmd):
-        # type: (Cmd) -> UUID
+    def create_command(self, cmd):
+        # type: (Cmd) -> Tuple[UUID, bool]
         id = cmd.get_id()
-        self.cmd_list.append(id)
+
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
+            self.evict()
+            return (id, False)
         else:
-            print('Reusing %s'%(self.cmd_hash[id]))
-
-        self.evict()
-
-        return id
+            # print('Reusing %s'%(self.cmd_hash[id]))
+            self.evict()
+            return (id, True)
 
     ## Find a binding in the working set, and return its index if it's there
     def add_or_lookup(self, the_id):
@@ -165,15 +171,53 @@ class GraphScript:
     def add_node(self, id, label, values):
         #binding,is_reused = self.add_or_lookup(id)
 
-        bind_cmd = self.append_command(PushCmd([id,values]))
-        print (str(self.cmd_hash[bind_cmd]))
-        node_cmd = self.append_command(NodeLabCmd(0, label))
-        print (str(self.cmd_hash[node_cmd]))
+        bind_cmd,ru1 = self.create_command(PushCmd([id,values]))
+        ru = "Reuse " if ru1 else ""
+        print (ru + str(self.cmd_hash[bind_cmd]))
+
+        if not ru1:
+            self.cmd_list.append(bind_cmd)
+
+        node_cmd,ru2 = self.create_command(NodeLabCmd(0, label))
+        ru = "Reuse " if ru2 else ""
+        if not ru2:
+            self.cmd_list.append(node_cmd)
+        print (ru + str(self.cmd_hash[node_cmd]))
+
+        cat_cmd,ru3 = self.create_command(CatCmd([0], [1]))
+        ru = "Reuse " if ru3 else ""
+
+        # FOR now we are greedy and always do at least the CAT
+        if not ru1 or not ru2:# or not ru3:
+            self.cmd_list.append(cat_cmd)
+        print (ru + str(self.cmd_hash[cat_cmd]))
 
         return node_cmd
 
-    def add_edge(self, source, label, dest, values):
-        return
+    def add_edge(self, source, label, dest):#, values):
+        bind1_cmd,ru1 = self.create_command(PushCmd([dest]))
+        ru = "Reuse " if ru1 else ""
+        print (ru + str(self.cmd_hash[bind1_cmd]))
+        bind2_cmd,ru2 = self.create_command(PushCmd([source]))
+        ru = "Reuse " if ru2 else ""
+        print (ru + str(self.cmd_hash[bind2_cmd]))
+        # if values:
+        #     bind3_cmd = self.append_command(PushCmd([values]))
+        #     print (str(self.cmd_hash[bind2_cmd]))
+        #     edge_cmd = self.append_command(EdgeCmd(1, 2, label, 0))
+        # else:
+        edge_cmd,ru3 = self.create_command(EdgeCmd(0, 1, label))
+        ru = "Reuse " if ru3 else ""
+        print (ru + str(self.cmd_hash[edge_cmd]))
+
+        cat_cmd,ru4 = self.create_command(Cat3Cmd([1], [2], [0]))
+        ru = "Reuse " if ru4 else ""
+        # FOR now we are greedy and always do at least the CAT
+        if not ru1 or not ru2 or not ru3:
+            self.cmd_list.append(cat_cmd)
+        print (ru + str(self.cmd_hash[cat_cmd]))
+
+        return edge_cmd
 
 class ProvenanceScript(ProvenanceStore):
     script = GraphScript()
@@ -191,15 +235,15 @@ class ProvenanceScript(ProvenanceStore):
         if 'id' in skolem_args:
             the_id = GraphScript.get_id_from_key(label + '.' + skolem_args.id)
         else:
-            the_id = GraphScript.get_id()
+            the_id = GraphScript.get_id_from_key('.'.join([label, str((skolem_args))]))
 
         print('Node: %s: (%s,%s)' %(the_id,label,str(skolem_args)))
         self.script.add_node(the_id, label, skolem_args)
-        return 1
+        return the_id
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> None
-        self.script.add_edge(source, label, dest, [])
+        self.script.add_edge(source, label, dest)
         return 1
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
