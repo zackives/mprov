@@ -138,14 +138,14 @@ class SQLProvenanceStore(ProvenanceStore):
     Pass-through interface for provenance event logs
     """
     def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> int
+        # type: (cursor, str, str, List[Any]) -> int
         """
         Inserts a node into the database cursor, for the given resource, with a given label.
         The skolem_args will be the basis of the value
         """
-        logging.debug('Node: ' + label + '(' + skolem_args + ')')
+        logging.debug('Node: ' + label + '(' + str(skolem_args) + ')')
         return db.execute("INSERT INTO MProv_Node(_key,_resource,label) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING RETURNING _created", \
-            (skolem_args,resource,label))
+            (str(skolem_args),resource,label))
 
     def add_nodeprop(self, db, resource, node, label, value, ind=None):
         # type: (cursor, str, str, str, Any, int) -> int
@@ -468,12 +468,14 @@ class EventBindingProvenanceStore(ProvenanceStore):
             self.binding_queue.append((id,ind,None,None,None,None,None,None,None,value,uuid,None))
         return
 
-    def add_node(self, db, resource, label, node_identifier):
-        # type: (cursor, str, str, str) -> int
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, List[Any]) -> int
         """
         Inserts a node into the database cursor, for the given resource, with a given label.
         The skolem_args will be the basis of the value
         """
+
+        node_identifier = str(node_identifier)
 
         # We are going to create a unique node signature including the node
         #logging.debug('Node: ' + label + '(' + skolem_args + ')')
@@ -893,14 +895,14 @@ class CachingSQLProvenanceStore(SQLProvenanceStore):
         return
 
     def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> int
+        # type: (cursor, str, str, List[Any]) -> int
         """
         Inserts a node into the database cursor, for the given resource, with a given label.
         The skolem_args will be the basis of the value
         """
-        logging.debug('Node: ' + label + '(' + skolem_args + ')')
-        ins_str = (skolem_args,resource,label)
-        self.node_pool.add(ins_str)
+        logging.debug('Node: ' + label + '(' + str(skolem_args) + ')')
+        ins_tup = (skolem_args,resource,label)
+        self.node_pool.add(ins_tup)
         if len(self.node_pool) > self.MAX_ELEMENTS:
             self._write_nodes(db)
 
@@ -1001,8 +1003,10 @@ class CompressingProvenanceStore(ProvenanceStore):
         # type: (cursor, str) -> None
         self.real_index.clear_tables(db, graph)
 
-    def add_node(self, db, resource, label, node_id):
-        # type: (cursor, str, str, str) -> int
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, List[Any]) -> int
+
+        node_id = str(skolem_args)
 
         ind = 0     # always use (n, 0)? TODO: expand to include repetition
         self.binding_to_index[node_id] = ind
@@ -1160,13 +1164,14 @@ class NewProvenanceStore(ProvenanceStore):
         #self.event_sets.get_event_expression_from_id(event_id)
         return
 
-    def add_node(self, db, resource, label, node_id):
-        # type: (cursor, str, str, str) -> int
-
+    def add_node(self, db, resource, label, skolem_args):
+        # type: (cursor, str, str, List[Any]) -> int
         """
         Queue up an event to write a node. Wait for any node properties to be assigned.
         Only write the node once we think the node properties are all assigned.
         """
+
+        node_id = str(skolem_args)
 
         if node_id not in self.graph_nodes:
             logging.debug('* ADD NODE ' + label + "(" + node_id + ")")
