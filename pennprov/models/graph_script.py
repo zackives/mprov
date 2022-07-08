@@ -17,26 +17,35 @@ class Op(Enum):
     EDGE = 20
     EDGE_LAB = 21
     CONCAT = 30
+    REF = 31
 
 class Cmd:
     op = None            # type: Op
     args = None          # Type: List[None]
     id = None
 
-    def __init__(self, op, args):
-        # type: (Op, List[Any]) -> None
+    def __init__(self, op, args, id=None):
+        # type: (Op, List[Any], UUID) -> None
         self.op = op
         self.args = args
-        self.id = GraphScript.get_id()
-        print(op)
+        if not id:
+            self.id = GraphScript.get_id()
+        else:
+            self.id = id
 
     def get_id(self):
         return self.id
 
+    def __str__(self) -> str:
+        return str(self.id) + ": " + str(self.op) + " " + str(self.args)
+
 class PushCmd(Cmd):
     def __init__(self, arg):
         # type: (UUID|str) -> None
-        Cmd.__init__(self, Op.PUSH, [arg])
+        if isinstance(arg, list):
+            Cmd.__init__(self, Op.PUSH, arg, arg[0])
+        else:
+            Cmd.__init__(self, Op.PUSH, [arg], arg)
 
 class SetCmd(Cmd):
     def __init__(self, arg, pos):
@@ -61,12 +70,12 @@ class XchCmd(Cmd):
 class NodeCmd(Cmd):
     def __init__(self, idinx, labinx):
         # type: (int, int) -> None
-        Cmd.__init__(self, Op.NODE, [idinx, labinx])
+        Cmd.__init__(self, Op.NODE, [idinx, labinx], GraphScript.get_id_from_key(str((idinx,labinx))))
 
 class NodeLabCmd(Cmd):
     def __init__(self, idinx, label):
         # type: (int, str) -> None
-        Cmd.__init__(self, Op.NODE_LAB, [idinx, label])
+        Cmd.__init__(self, Op.NODE_LAB, [idinx, label], GraphScript.get_id_from_key(str(idinx) + ',' + label))
 
 class EdgeCmd(Cmd):
     def __init__(self, frominx, labinx, toinx):
@@ -83,11 +92,16 @@ class CatCmd(Cmd):
         # type: (int, List[Any], List[Any]) -> None
         Cmd.__init__(self, Op.CONCAT, [left_interval, right_interval])
 
+class RefCmd(Cmd):
+    def __init__(self, prev_cmd):
+        # type: (int, UUID) -> None
+        Cmd.__init__(self, Op.REF, [prev_cmd])
+
 class GraphScript:
     # Bounded LRU queue, from ordering -> hash
     cmd_list = []           # type: List[UUID]
     # Hash --> command
-    cmd_hash = []           # type: Mapping[UUID,Cmd]
+    cmd_hash = {}           # type: Mapping[UUID,Cmd]
 
     working_set = []        # type: List[UUID]
 
@@ -114,6 +128,8 @@ class GraphScript:
         self.cmd_list.append(id)
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
+        else:
+            print('Reusing %s'%(self.cmd_hash[id]))
 
         self.evict()
 
@@ -147,17 +163,12 @@ class GraphScript:
         pass
 
     def add_node(self, id, label, values):
-        binding,is_reused = self.add_or_lookup(id)
+        #binding,is_reused = self.add_or_lookup(id)
 
-        if not is_reused:
-            bind_cmd = self.append_command(PushCmd(id))
-            node_cmd = self.append_command(NodeLabCmd(bind_cmd, label))
-            batch_cmd = self.append_command(CatCmd([bind_cmd], [node_cmd]))
-        else:
-            # TODO
-            #bind_cmd = self.reuse_command(PushCmd(id))
-            #node_cmd = self.append_command(NodeLabCmd(bind_cmd, label))
-            pass
+        bind_cmd = self.append_command(PushCmd([id,values]))
+        print (str(self.cmd_hash[bind_cmd]))
+        node_cmd = self.append_command(NodeLabCmd(0, label))
+        print (str(self.cmd_hash[node_cmd]))
 
         return node_cmd
 
@@ -174,8 +185,15 @@ class ProvenanceScript(ProvenanceStore):
 
     
     def add_node(self, db, resource, label, skolem_args):
-        # type: (cursor, str, str, str) -> None
-        the_id = GraphScript.get_id()
+        # type: (cursor, str, str, List[Any]) -> None
+
+        # Use an ID field as a key, if it exists
+        if 'id' in skolem_args:
+            the_id = GraphScript.get_id_from_key(label + '.' + skolem_args.id)
+        else:
+            the_id = GraphScript.get_id()
+
+        print('Node: %s: (%s,%s)' %(the_id,label,str(skolem_args)))
         self.script.add_node(the_id, label, skolem_args)
         return 1
 
