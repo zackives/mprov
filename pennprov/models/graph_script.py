@@ -4,6 +4,8 @@ from typing import List, Any, Mapping, Tuple
 import uuid
 from uuid import UUID
 
+import logging
+
 from pennprov.connection.provenance_store import ProvenanceStore
 
 class Op(Enum):
@@ -105,83 +107,77 @@ class RefCmd(Cmd):
 
 class GraphScript:
     # Bounded LRU queue, from ordering -> hash
-    cmd_list = []           # type: List[UUID]
+    cmd_list: List[UUID] = []
     # Hash --> command
-    cmd_hash = {}           # type: Mapping[UUID,Cmd]
-
-    working_set = []        # type: List[UUID]
+    cmd_hash: Mapping[UUID,Cmd] = {}
 
     # Should it be a list of lists? a tree?
 
-    MAX = 1024
+    MAX: int = 1024              # max entries in command LRU queue
 
-    def get_id():
-        # type: () -> UUID
+    def get_id() -> UUID:
+        """
+        Returns a new UUID
+        """
         return uuid.uuid4()
 
-    def get_id_from_key(key):
-        # type: (Any) -> UUID
+    def get_id_from_key(key: Any) -> UUID:
+        """
+        Returns a hash of the provided key
+        """
         return uuid.uuid5(uuid.NAMESPACE_URL, key)
 
 
-    def evict(self):
+    def evict(self) -> None:
+        """
+        If the command list has exceeded MAX length, evicts
+        the oldest item in the queue
+        """
         if len(self.cmd_list) > self.MAX:
             pass
 
-    def create_command(self, cmd):
-        # type: (Cmd) -> Tuple[UUID, bool]
+    def add_or_promote_command(self, the_id: UUID) -> bool:
+        """
+        Given a UUID, promote it to the top of the LRU list
+        """
+        if the_id in self.cmd_list:
+            self.cmd_list.remove(the_id)
+            self.cmd_list.append(the_id)
+            return True
+        else:
+            self.cmd_list.append(the_id)
+            self.evict()
+            return False
+
+    def create_command(self, cmd: Cmd) -> Tuple[UUID, bool]:
+        """
+        Given the Cmd and its unique signature -- creates
+        a new Cmd with a new UUID, or returns the UUID of a previous
+        occurrence.
+        """
         id = cmd.get_id()
 
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
-            self.evict()
             return (id, False)
         else:
-            # print('Reusing %s'%(self.cmd_hash[id]))
-            self.evict()
             return (id, True)
 
-    ## Find a binding in the working set, and return its index if it's there
-    def add_or_lookup(self, the_id):
-        # type: (UUID) -> int
-        if the_id not in self.working_set:
-            self.working_set.append(the_id)
-            return (len(self.working_set) - 1, False)
-        else:
-            inx = self.working_set.index(the_id)
-            return (inx, True)
-
-    def reuse_command_by_index(self, inx_pos):
-        # type: (int) -> UUID
-        hash  = self.cmd_list[inx_pos]
-        self.cmd_list.remove(hash)
-        self.cmd_list.append(hash)
-        return hash
-
-    def discard_command_by_index(self, inx_pos):
-        # type: (int) -> None
-        hash  = self.cmd_list[inx_pos]
-        self.cmd_list.remove(hash)
-        del self.cmd_hash[hash]
-
-    def apply_script(self, target, start=0, end=-1):
-        # type: (ProvenanceStore, int, int) -> None
+    def apply_script(self, target: ProvenanceStore, start:int=0, end:int=-1) -> None:
         pass
 
-    def add_node(self, id, label, values):
-        #binding,is_reused = self.add_or_lookup(id)
-
+    def add_node(self, id: UUID, label: str, values: Tuple[Any]) -> UUID:
         bind_cmd,ru1 = self.create_command(PushCmd([id,values]))
         ru = "Reuse " if ru1 else ""
         print (ru + str(self.cmd_hash[bind_cmd]))
 
         if not ru1:
-            self.cmd_list.append(bind_cmd)
+            self.add_or_promote_command(bind_cmd)
 
         node_cmd,ru2 = self.create_command(NodeLabCmd(0, label))
         ru = "Reuse " if ru2 else ""
         if not ru2:
-            self.cmd_list.append(node_cmd)
+            self.add_or_promote_command(node_cmd)
         print (ru + str(self.cmd_hash[node_cmd]))
 
         cat_cmd,ru3 = self.create_command(CatCmd([0], [1]))
@@ -189,32 +185,39 @@ class GraphScript:
 
         # FOR now we are greedy and always do at least the CAT
         if not ru1 or not ru2:# or not ru3:
-            self.cmd_list.append(cat_cmd)
+            self.add_or_promote_command(cat_cmd)
+
         print (ru + str(self.cmd_hash[cat_cmd]))
 
         return node_cmd
 
-    def add_edge(self, source, label, dest):#, values):
+    def add_edge(self, source: UUID, label: str, dest: UUID) -> UUID:
+        """
+        Adds an edge between the source and node with a given label.
+        Current version does NOT have properties but this could be extended.
+        """
         bind1_cmd,ru1 = self.create_command(PushCmd([dest]))
         ru = "Reuse " if ru1 else ""
         print (ru + str(self.cmd_hash[bind1_cmd]))
+        if not ru1:
+            self.add_or_promote_command(bind1_cmd)
         bind2_cmd,ru2 = self.create_command(PushCmd([source]))
         ru = "Reuse " if ru2 else ""
         print (ru + str(self.cmd_hash[bind2_cmd]))
-        # if values:
-        #     bind3_cmd = self.append_command(PushCmd([values]))
-        #     print (str(self.cmd_hash[bind2_cmd]))
-        #     edge_cmd = self.append_command(EdgeCmd(1, 2, label, 0))
-        # else:
+        if not ru2:
+            self.add_or_promote_command(bind2_cmd)
+
         edge_cmd,ru3 = self.create_command(EdgeCmd(0, 1, label))
         ru = "Reuse " if ru3 else ""
         print (ru + str(self.cmd_hash[edge_cmd]))
+        if not ru3:
+            self.add_or_promote_command(edge_cmd)
 
         cat_cmd,ru4 = self.create_command(Cat3Cmd([1], [2], [0]))
         ru = "Reuse " if ru4 else ""
         # FOR now we are greedy and always do at least the CAT
         if not ru1 or not ru2 or not ru3:
-            self.cmd_list.append(cat_cmd)
+            self.add_or_promote_command(cat_cmd)
         print (ru + str(self.cmd_hash[cat_cmd]))
 
         return edge_cmd
@@ -300,10 +303,10 @@ class ProvenanceScript(ProvenanceStore):
 
 
 def write_motif(db, store, prog1_source, input_common, offset):
-    input1 = store.add_node(db, "mprov", "entity", ['stream1', 1+offset,3+offset,'x'])
-    input2 = store.add_node(db, "mprov", "entity", ['stream2', 2+offset,4+offset,'y'])
-    prog1_exec1 = store.add_node(db, "mprov", 'activity', ['prog1','7-1-2022'])
-    output1 = store.add_node(db, "mprov", "entity", ['stream3', 3+offset,5+offset,'z'])
+    input1 = store.add_node(db, "mprov", "entity", ('stream1', 1+offset,3+offset,'x'))
+    input2 = store.add_node(db, "mprov", "entity", ('stream2', 2+offset,4+offset,'y'))
+    prog1_exec1 = store.add_node(db, "mprov", 'activity', ('prog1','7-1-2022'))
+    output1 = store.add_node(db, "mprov", "entity", ('stream3', 3+offset,5+offset,'z'))
     edge1 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input1)
     edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input2)
     edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input_common)
@@ -315,8 +318,8 @@ def write_motif(db, store, prog1_source, input_common, offset):
 
 def simple_test(db, store):
     # These nodes are used across multiple motifs
-    input_common = store.add_node(db, "mprov", "entity", ['file1'])
-    prog1_source = store.add_node(db, 'mprov', 'entity', ['prog1.c', '1-1-1980'])
+    input_common = store.add_node(db, "mprov", "entity", ('file1',))
+    prog1_source = store.add_node(db, 'mprov', 'entity', ('prog1.c', '1-1-1980'))
 
     write_motif(db, store, prog1_source, input_common, 1)
     write_motif(db, store, prog1_source, input_common, 2)
