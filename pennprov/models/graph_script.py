@@ -33,8 +33,10 @@ class Cmd:
         self.args = args
         if not id:
             self.id = GraphScript.get_id()
-        else:
+        elif isinstance(id, UUID):
             self.id = id
+        else:
+            self.id = GraphScript.get_id_from_key(str(id))
 
     def get_id(self):
         return self.id
@@ -49,6 +51,13 @@ class PushCmd(Cmd):
             Cmd.__init__(self, Op.PUSH, arg, arg[0])
         else:
             Cmd.__init__(self, Op.PUSH, [arg], arg)
+
+    def __str__(self) -> str:
+        if len(self.args) == 1 and isinstance(self.args[0], Tuple) and \
+            len(self.args[0]) == 1 and isinstance(self.args[0][0], UUID):
+            return str(self.id) + ": " + str(self.op) + " " + self.args[0][0].hex
+        else:
+            return Cmd.__str__(self)
 
 class SetCmd(Cmd):
     def __init__(self, arg, pos):
@@ -98,22 +107,47 @@ class CatCmd(Cmd):
 class Cat3Cmd(Cmd):
     def __init__(self, left_interval, mid_interval, right_interval):
         # type: (int, List[Any], List[Any]) -> None
-        Cmd.__init__(self, Op.CONCAT, [left_interval, mid_interval, right_interval], GraphScript.get_id())
+        Cmd.__init__(self, Op.CONCAT3, [left_interval, mid_interval, right_interval], GraphScript.get_id())
 
 class RefCmd(Cmd):
     def __init__(self, prev_cmd):
         # type: (int, UUID) -> None
         Cmd.__init__(self, Op.REF, [prev_cmd])
 
+    def __str__(self) -> str:
+        return str(self.id) + ": " + str(self.op) + " " + str([str(x)+ " " for x in self.args])
+
+class CmdLog:
+    # Actual history log, to push to DB
+    cmd_log: List[UUID] = []
+
+    def __init__(self, store: ProvenanceStore):
+        pass
+
+    def append(self, command: Cmd):
+        self.cmd_log.append(command)
+
+    def apply(self):
+        print("** Commands **")
+        for item in self.cmd_log:
+            print("%s"%item)
 class GraphScript:
     # Bounded LRU queue, from ordering -> hash
     cmd_list: List[UUID] = []
+
+    cmd_log: CmdLog
+
     # Hash --> command
     cmd_hash: Mapping[UUID,Cmd] = {}
+    cmd_stack: Mapping[UUID,List[Any]] = {}
 
-    # Should it be a list of lists? a tree?
+    # The list of commands that we are queuing up
+    working_sequence: List[UUID] = []
 
     MAX: int = 1024              # max entries in command LRU queue
+
+    def __init__(self, store: ProvenanceStore):
+        self.cmd_log = CmdLog(store)
 
     def get_id() -> UUID:
         """
@@ -131,14 +165,18 @@ class GraphScript:
     def evict(self) -> None:
         """
         If the command list has exceeded MAX length, evicts
-        the oldest item in the queue
+        the oldest item in the queue, including its stack and command
         """
-        if len(self.cmd_list) > self.MAX:
-            pass
+        while len(self.cmd_list) > self.MAX:
+            cmd = self.cmd_list[-1]
+            del self.cmd_list[-1]
+            del self.cmd_stack[cmd]
+            del self.cmd_hash[cmd]
 
     def add_or_promote_command(self, the_id: UUID) -> bool:
         """
-        Given a UUID, promote it to the top of the LRU list
+        Given a UUID, promote it to the top of the LRU list. Returns True
+        if we are promoting, False if it's a new command.
         """
         if the_id in self.cmd_list:
             self.cmd_list.remove(the_id)
@@ -163,31 +201,82 @@ class GraphScript:
         else:
             return (id, True)
 
+    def create_command(self, cmd: Cmd) -> Tuple[UUID, bool]:
+        """
+        Given the Cmd and its unique signature -- creates
+        a new Cmd with a new UUID, or returns the UUID of a previous
+        occurrence.
+        """
+        id = cmd.get_id()
+
+        if id not in self.cmd_hash:
+            self.cmd_hash[id] = cmd
+            return (id, False)
+        else:
+            return (id, True)
+
     def apply_script(self, target: ProvenanceStore, start:int=0, end:int=-1) -> None:
-        pass
+        self.cmd_log.apply()
+
+    def flush_working_sequence(self):
+        # For now, dequeue all items in the working sequence
+        # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
+        # re-indexing
+
+        # Trigger a CONCAT each time we have a new PUSH that doesn't 
+        # match an existing sequence?
+        if len(self.working_sequence) == 1:
+            for item in self.working_sequence:
+                self.cmd_log.append(self.cmd_hash[item])
+        elif len(self.working_sequence):
+            for item in self.working_sequence:
+                self.cmd_log.append(RefCmd(self.cmd_hash[item]))
+
+        self.working_sequence.clear()
+
 
     def add_node(self, id: UUID, label: str, values: Tuple[Any]) -> UUID:
+        """
+        Create a new node with a given id and tuple
+        """
+        arg_stack: List[Tuple] = []
+        arg_stack.append([id, values])
+
         bind_cmd,ru1 = self.create_command(PushCmd([id,values]))
         ru = "Reuse " if ru1 else ""
         print (ru + str(self.cmd_hash[bind_cmd]))
 
-        if not ru1:
-            self.add_or_promote_command(bind_cmd)
+        self.add_or_promote_command(bind_cmd)
+        if ru1:
+            self.working_sequence.append(bind_cmd)
+        else:
+            self.cmd_log.append(self.cmd_hash[bind_cmd])
 
         node_cmd,ru2 = self.create_command(NodeLabCmd(0, label))
         ru = "Reuse " if ru2 else ""
-        if not ru2:
-            self.add_or_promote_command(node_cmd)
+        self.add_or_promote_command(node_cmd)
+        if ru2:
+            self.working_sequence.append(node_cmd)
+        else:
+            self.cmd_log.append(self.cmd_hash[node_cmd])
         print (ru + str(self.cmd_hash[node_cmd]))
 
-        cat_cmd,ru3 = self.create_command(CatCmd([0], [1]))
+        # TODO: this should only be unique if the binding is unique
+        cat_cmd,ru3 = self.create_command(CatCmd((0,), (1,)))
         ru = "Reuse " if ru3 else ""
 
         # FOR now we are greedy and always do at least the CAT
-        if not ru1 or not ru2:# or not ru3:
-            self.add_or_promote_command(cat_cmd)
+        #if not ru1 or not ru2:# or not ru3:
+        if not self.add_or_promote_command(cat_cmd):
+            self.cmd_stack[cat_cmd] = arg_stack
+            print ("Args: %s"%arg_stack)
+        else:
+            self.working_sequence.append(cat_cmd)
+            self.cmd_log.append(self.cmd_hash[cat_cmd])
 
         print (ru + str(self.cmd_hash[cat_cmd]))
+
+        self.flush_working_sequence()
 
         return node_cmd
 
@@ -196,39 +285,62 @@ class GraphScript:
         Adds an edge between the source and node with a given label.
         Current version does NOT have properties but this could be extended.
         """
-        bind1_cmd,ru1 = self.create_command(PushCmd([dest]))
+        arg_stack: List[Tuple] = []
+        arg_stack.append((dest,))
+        arg_stack.append((source,))
+
+        bind1_cmd,ru1 = self.create_command(PushCmd((dest,)))
         ru = "Reuse " if ru1 else ""
         print (ru + str(self.cmd_hash[bind1_cmd]))
-        if not ru1:
-            self.add_or_promote_command(bind1_cmd)
-        bind2_cmd,ru2 = self.create_command(PushCmd([source]))
+        self.add_or_promote_command(bind1_cmd)
+        if ru1:
+            self.working_sequence.append(bind1_cmd)
+        else:
+            self.cmd_log.append(self.cmd_hash[bind1_cmd])
+
+        bind2_cmd,ru2 = self.create_command(PushCmd((source,)))
         ru = "Reuse " if ru2 else ""
         print (ru + str(self.cmd_hash[bind2_cmd]))
-        if not ru2:
-            self.add_or_promote_command(bind2_cmd)
+        self.add_or_promote_command(bind2_cmd)
+        if ru2:
+            self.working_sequence.append(bind2_cmd)
+        else:
+            self.cmd_log.append(self.cmd_hash[bind2_cmd])
 
         edge_cmd,ru3 = self.create_command(EdgeCmd(0, 1, label))
         ru = "Reuse " if ru3 else ""
         print (ru + str(self.cmd_hash[edge_cmd]))
-        if not ru3:
-            self.add_or_promote_command(edge_cmd)
+        self.add_or_promote_command(edge_cmd)
+        if ru3:
+            self.working_sequence.append(edge_cmd)
+        else:
+            self.cmd_log.append(self.cmd_hash[edge_cmd])
 
-        cat_cmd,ru4 = self.create_command(Cat3Cmd([1], [2], [0]))
+        cat_cmd,ru4 = self.create_command(Cat3Cmd((1,), (2,), [0]))
         ru = "Reuse " if ru4 else ""
+
         # FOR now we are greedy and always do at least the CAT
-        if not ru1 or not ru2 or not ru3:
-            self.add_or_promote_command(cat_cmd)
+        #if not ru1 or not ru2 or not ru3:
+        if not self.add_or_promote_command(cat_cmd):
+            self.cmd_stack[cat_cmd] = arg_stack
+            print ("Args: %s"%arg_stack)
+        else:
+            self.working_sequence.append(cat_cmd)
+            self.cmd_log.append(self.cmd_hash[cat_cmd])
         print (ru + str(self.cmd_hash[cat_cmd]))
+
+        self.flush_working_sequence()
 
         return edge_cmd
 
 class ProvenanceScript(ProvenanceStore):
-    script = GraphScript()
-    sub_store = None
+    script: GraphScript
+    sub_store: ProvenanceStore
 
     def __init__(self, sub_store):
         # type: (ProvenanceStore) -> None
         self.sub_store = sub_store
+        self.script = GraphScript(sub_store)
 
     
     def add_node(self, db, resource, label, skolem_args):
@@ -254,6 +366,7 @@ class ProvenanceScript(ProvenanceStore):
         return 1
 
     def flush(self, db, resource):
+        self.script.apply_script(self.sub_store)
         self.sub_store.flush(db, resource)
         return
 
@@ -324,5 +437,7 @@ def simple_test(db, store):
     write_motif(db, store, prog1_source, input_common, 1)
     write_motif(db, store, prog1_source, input_common, 2)
     write_motif(db, store, prog1_source, input_common, 3)
+
+    store.flush(db, "mprov")
 
 simple_test(None, ProvenanceScript(ProvenanceStore()))
