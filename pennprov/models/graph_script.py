@@ -14,9 +14,7 @@ class Op(Enum):
     POP = 2
     DEL = 3
     XCH = 4
-    NODE = 10
     NODE_LAB = 11
-    EDGE = 20
     EDGE_LAB = 21
     CONCAT = 30
     CONCAT3 = 31
@@ -79,20 +77,10 @@ class XchCmd(Cmd):
         # type: (int, int) -> None
         Cmd.__init__(self, Op.XCH, [pos1, pos2])
 
-class NodeCmd(Cmd):
-    def __init__(self, idinx, labinx):
-        # type: (int, int) -> None
-        Cmd.__init__(self, Op.NODE, [idinx, labinx], GraphScript.get_id_from_key(str((idinx,labinx))))
-
 class NodeLabCmd(Cmd):
     def __init__(self, idinx, label):
         # type: (int, str) -> None
         Cmd.__init__(self, Op.NODE_LAB, [idinx, label], GraphScript.get_id_from_key(str(idinx) + ',' + label))
-
-class EdgeCmd(Cmd):
-    def __init__(self, frominx, labinx, toinx):
-        # type: (int, int, int) -> None
-        Cmd.__init__(self, Op.EDGE, [frominx, labinx, toinx], GraphScript.get_id_from_key(str((frominx, toinx))))
 
 class EdgeLabCmd(Cmd):
     def __init__(self, frominx, label, toinx):
@@ -131,6 +119,8 @@ class CmdLog:
         print("** Commands **")
         for item in self.cmd_log:
             print("%s"%item)
+
+
 class GraphScript:
     # Bounded LRU queue, from ordering -> hash
     cmd_list: List[UUID] = []
@@ -218,19 +208,83 @@ class GraphScript:
     def apply_script(self, target: ProvenanceStore, start:int=0, end:int=-1) -> None:
         self.cmd_log.apply()
 
+
+    def merge_bindings(self, working_list: List[Cmd]) -> List[Cmd]:
+        updated_list = working_list.copy()
+        binding_list: List[Cmd] = []
+        updated_command_list: List[Cmd] = []
+
+        print ('Merging %s'%updated_list)
+
+        # Collect each item
+        for item in working_list:
+            if isinstance(self.cmd_hash[item], PushCmd):
+                if item not in binding_list:
+                    binding_list.append(item)
+                    # print (' Added push item to stack %s' %item)
+                    updated_command_list.append(item)
+
+        for first_k in range(1, len(binding_list)+1):
+            # For each prefix of the binding list, collect
+            # all commands that specifically reference the bindings
+            # in that prefix
+            args = binding_list[0:first_k]
+            # print("Studying %s" %args)
+            inx = 0
+            working_stack = []
+            while inx < len(updated_list):
+                command = self.cmd_hash[updated_list[inx]]
+
+                if isinstance(command, PushCmd):
+                    # Drop the PUSH commands
+                    print ('***  PUSH %s %s'%(command,command.args))
+                    
+                    ### Only continue expanding the stack if we are allowed
+                    ### this many binding parameters!!!
+                    if command.args[0] in working_stack or \
+                    len(set(working_stack)) < len(args):
+                        working_stack.append(command.args[0])
+                    else:
+                        break
+                    inx = inx + 1
+                elif isinstance(command, NodeLabCmd):
+                    # TODO: rewrite with the correct index
+                    # print ('NODE with stack top %s'%working_stack[-1])
+                    if working_stack[-1-command.args[0]] in args:
+                        # print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],args.index(working_stack[-1-command.args[0]])))
+                        new_command,_ = self.create_command(NodeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1]))
+                        print ('*** %s %s'%(self.cmd_hash[new_command], args[self.cmd_hash[new_command].args[0]]))
+                        updated_command_list.append(new_command)
+                        del updated_list[inx]
+                    else:
+                        inx = inx + 1
+                elif isinstance(command, EdgeLabCmd):
+                    # TODO: rewrite
+                    print('%s'%working_stack)
+                    print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],working_stack[-1-command.args[2]]))
+                    if working_stack[-1-command.args[0]] in args and working_stack[-1-command.args[2]] in args:
+                        new_command, _ = self.create_command(EdgeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1], args.index(working_stack[-1-command.args[2]])))
+                        print ('**> %s %s %s'%(self.cmd_hash[new_command],args[self.cmd_hash[new_command].args[0]],args[self.cmd_hash[new_command].args[2]]))
+                        updated_command_list.append(new_command)
+                        del updated_list[inx]
+                    else:
+                        inx = inx + 1
+                else:
+                    inx = inx + 1
+
+        return updated_command_list
+
     def flush_working_sequence(self):
         # For now, dequeue all items in the working sequence
         # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
         # re-indexing
 
+        self.working_sequence = self.merge_bindings(self.working_sequence)
+
         # Trigger a CONCAT each time we have a new PUSH that doesn't 
         # match an existing sequence?
-        if len(self.working_sequence) == 1:
-            for item in self.working_sequence:
-                self.cmd_log.append(self.cmd_hash[item])
-        elif len(self.working_sequence):
-            for item in self.working_sequence:
-                self.cmd_log.append(RefCmd(self.cmd_hash[item]))
+        for item in self.working_sequence:
+            self.cmd_log.append(self.cmd_hash[item])
 
         self.working_sequence.clear()
 
@@ -239,44 +293,45 @@ class GraphScript:
         """
         Create a new node with a given id and tuple
         """
+        # return
         arg_stack: List[Tuple] = []
         arg_stack.append([id, values])
 
         bind_cmd,ru1 = self.create_command(PushCmd([id,values]))
-        ru = "Reuse " if ru1 else ""
-        print (ru + str(self.cmd_hash[bind_cmd]))
+        # ru = "Reuse " if ru1 else ""
+        # print (ru + str(self.cmd_hash[bind_cmd]))
 
         self.add_or_promote_command(bind_cmd)
-        if ru1:
-            self.working_sequence.append(bind_cmd)
-        else:
-            self.cmd_log.append(self.cmd_hash[bind_cmd])
+        # if ru1:
+        self.working_sequence.append(bind_cmd)
+        #if not ru1:
+        #    self.cmd_log.append(self.cmd_hash[bind_cmd])
 
         node_cmd,ru2 = self.create_command(NodeLabCmd(0, label))
-        ru = "Reuse " if ru2 else ""
+        # ru = "Reuse " if ru2 else ""
         self.add_or_promote_command(node_cmd)
-        if ru2:
-            self.working_sequence.append(node_cmd)
-        else:
-            self.cmd_log.append(self.cmd_hash[node_cmd])
-        print (ru + str(self.cmd_hash[node_cmd]))
+        # if ru2:
+        self.working_sequence.append(node_cmd)
+        #if not ru2:#else:
+        #    self.cmd_log.append(self.cmd_hash[node_cmd])
+        # print (ru + str(self.cmd_hash[node_cmd]))
 
-        # TODO: this should only be unique if the binding is unique
-        cat_cmd,ru3 = self.create_command(CatCmd((0,), (1,)))
-        ru = "Reuse " if ru3 else ""
+        # # TODO: this should only be unique if the binding is unique
+        # cat_cmd,ru3 = self.create_command(CatCmd((bind_cmd,), (node_cmd,)))
+        # ru = "Reuse " if ru3 else ""
 
-        # FOR now we are greedy and always do at least the CAT
-        #if not ru1 or not ru2:# or not ru3:
-        if not self.add_or_promote_command(cat_cmd):
-            self.cmd_stack[cat_cmd] = arg_stack
-            print ("Args: %s"%arg_stack)
-        else:
-            self.working_sequence.append(cat_cmd)
-            self.cmd_log.append(self.cmd_hash[cat_cmd])
+        # # FOR now we are greedy and always do at least the CAT
+        # #if not ru1 or not ru2:# or not ru3:
+        # if not ru3 and not self.add_or_promote_command(cat_cmd):
+        #     self.cmd_stack[cat_cmd] = arg_stack
+        #     print ("Args: %s"%arg_stack)
+        # else:
+        #     self.working_sequence.append(cat_cmd)
+        #     #self.cmd_log.append(self.cmd_hash[cat_cmd])
 
-        print (ru + str(self.cmd_hash[cat_cmd]))
+        # print (ru + str(self.cmd_hash[cat_cmd]))
 
-        self.flush_working_sequence()
+        # self.flush_working_sequence()
 
         return node_cmd
 
@@ -285,55 +340,60 @@ class GraphScript:
         Adds an edge between the source and node with a given label.
         Current version does NOT have properties but this could be extended.
         """
+        # return
         arg_stack: List[Tuple] = []
         arg_stack.append((dest,))
         arg_stack.append((source,))
 
-        bind1_cmd,ru1 = self.create_command(PushCmd((dest,)))
-        ru = "Reuse " if ru1 else ""
-        print (ru + str(self.cmd_hash[bind1_cmd]))
+        bind1_cmd,ru1 = self.create_command(PushCmd([dest]))
+        # ru = "Reuse " if ru1 else ""
+        # print (ru + str(self.cmd_hash[bind1_cmd]))
         self.add_or_promote_command(bind1_cmd)
-        if ru1:
-            self.working_sequence.append(bind1_cmd)
-        else:
-            self.cmd_log.append(self.cmd_hash[bind1_cmd])
+        # if ru1:
+        self.working_sequence.append(bind1_cmd)
+        
+        # if not ru1:
+            # self.cmd_log.append(self.cmd_hash[bind1_cmd])
 
-        bind2_cmd,ru2 = self.create_command(PushCmd((source,)))
-        ru = "Reuse " if ru2 else ""
-        print (ru + str(self.cmd_hash[bind2_cmd]))
+        bind2_cmd,ru2 = self.create_command(PushCmd([source]))
+        # ru = "Reuse " if ru2 else ""
+        # print (ru + str(self.cmd_hash[bind2_cmd]))
         self.add_or_promote_command(bind2_cmd)
-        if ru2:
-            self.working_sequence.append(bind2_cmd)
-        else:
-            self.cmd_log.append(self.cmd_hash[bind2_cmd])
+        # if ru2:
+        self.working_sequence.append(bind2_cmd)
+        # else:
+            # self.cmd_log.append(self.cmd_hash[bind2_cmd])
 
-        edge_cmd,ru3 = self.create_command(EdgeCmd(0, 1, label))
-        ru = "Reuse " if ru3 else ""
-        print (ru + str(self.cmd_hash[edge_cmd]))
+        edge_cmd,ru3 = self.create_command(EdgeLabCmd(0, label, 1))
+        # ru = "Reuse " if ru3 else ""
+        # print (ru + str(self.cmd_hash[edge_cmd]))
         self.add_or_promote_command(edge_cmd)
-        if ru3:
-            self.working_sequence.append(edge_cmd)
-        else:
-            self.cmd_log.append(self.cmd_hash[edge_cmd])
+        # if ru3:
+        self.working_sequence.append(edge_cmd)
+        # else:
+            # self.cmd_log.append(self.cmd_hash[edge_cmd])
 
-        cat_cmd,ru4 = self.create_command(Cat3Cmd((1,), (2,), [0]))
-        ru = "Reuse " if ru4 else ""
+        # cat_cmd,ru4 = self.create_command(Cat3Cmd((bind1_cmd,), (bind2_cmd,), [edge_cmd]))
+        # ru = "Reuse " if ru4 else ""
 
-        # FOR now we are greedy and always do at least the CAT
-        #if not ru1 or not ru2 or not ru3:
-        if not self.add_or_promote_command(cat_cmd):
-            self.cmd_stack[cat_cmd] = arg_stack
-            print ("Args: %s"%arg_stack)
-        else:
-            self.working_sequence.append(cat_cmd)
-            self.cmd_log.append(self.cmd_hash[cat_cmd])
-        print (ru + str(self.cmd_hash[cat_cmd]))
+        # # FOR now we are greedy and always do at least the CAT
+        # #if not ru1 or not ru2 or not ru3:
+        # if not ru4 and not self.add_or_promote_command(cat_cmd):
+        #     self.cmd_stack[cat_cmd] = arg_stack
+        #     print ("Args: %s"%arg_stack)
+        # # else:
+        # self.working_sequence.append(cat_cmd)
+        #     # self.cmd_log.append(self.cmd_hash[cat_cmd])
+        # print (ru + str(self.cmd_hash[cat_cmd]))
 
-        self.flush_working_sequence()
+        # self.flush_working_sequence()
 
         return edge_cmd
 
 class ProvenanceScript(ProvenanceStore):
+    """
+    Adapter from ProvenanceStore to a graph script
+    """
     script: GraphScript
     sub_store: ProvenanceStore
 
@@ -358,6 +418,7 @@ class ProvenanceScript(ProvenanceStore):
 
     def add_edge(self, db, resource, source, label, dest):
         # type: (cursor, str, str, str, str) -> None
+        print('Edge: (%s,%s,%s)' %(source,label,dest))
         self.script.add_edge(source, label, dest)
         return 1
 
@@ -366,6 +427,7 @@ class ProvenanceScript(ProvenanceStore):
         return 1
 
     def flush(self, db, resource):
+        self.script.flush_working_sequence()
         self.script.apply_script(self.sub_store)
         self.sub_store.flush(db, resource)
         return
@@ -422,21 +484,21 @@ def write_motif(db, store, prog1_source, input_common, offset):
     output1 = store.add_node(db, "mprov", "entity", ('stream3', 3+offset,5+offset,'z'))
     edge1 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input1)
     edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input2)
-    edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input_common)
-    edge3 = store.add_edge(db, 'mprov', output1, 'wasGeneratedBy', prog1_exec1)
-    edge4 = store.add_edge(db, 'mprov', prog1_exec1, 'used', prog1_source)
-    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input1)
-    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input2)
-    edge5 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input_common)
+    edge3 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input_common)
+    edge4 = store.add_edge(db, 'mprov', output1, 'wasGeneratedBy', prog1_exec1)
+    edge5 = store.add_edge(db, 'mprov', prog1_exec1, 'used', prog1_source)
+    edge6 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input1)
+    edge7 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input2)
+    edge8 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input_common)
 
 def simple_test(db, store):
     # These nodes are used across multiple motifs
     input_common = store.add_node(db, "mprov", "entity", ('file1',))
     prog1_source = store.add_node(db, 'mprov', 'entity', ('prog1.c', '1-1-1980'))
 
-    write_motif(db, store, prog1_source, input_common, 1)
-    write_motif(db, store, prog1_source, input_common, 2)
-    write_motif(db, store, prog1_source, input_common, 3)
+    write_motif(db, store, prog1_source, input_common, 10)
+    # write_motif(db, store, prog1_source, input_common, 20)
+    # write_motif(db, store, prog1_source, input_common, 30)
 
     store.flush(db, "mprov")
 
