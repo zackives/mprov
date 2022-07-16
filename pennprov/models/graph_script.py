@@ -237,7 +237,7 @@ class GraphScript:
 
                 if isinstance(command, PushCmd):
                     # Drop the PUSH commands
-                    print ('***  PUSH %s %s'%(command,command.args))
+                    #print ('***  PUSH %s %s'%(command,command.args))
                     
                     ### Only continue expanding the stack if we are allowed
                     ### this many binding parameters!!!
@@ -260,8 +260,8 @@ class GraphScript:
                         inx = inx + 1
                 elif isinstance(command, EdgeLabCmd):
                     # TODO: rewrite
-                    print('%s'%working_stack)
-                    print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],working_stack[-1-command.args[2]]))
+                    #print('%s'%working_stack)
+                    #print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],working_stack[-1-command.args[2]]))
                     if working_stack[-1-command.args[0]] in args and working_stack[-1-command.args[2]] in args:
                         new_command, _ = self.create_command(EdgeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1], args.index(working_stack[-1-command.args[2]])))
                         print ('**> %s %s %s'%(self.cmd_hash[new_command],args[self.cmd_hash[new_command].args[0]],args[self.cmd_hash[new_command].args[2]]))
@@ -293,43 +293,14 @@ class GraphScript:
         """
         Create a new node with a given id and tuple
         """
-        # return
-        arg_stack: List[Tuple] = []
-        arg_stack.append([id, values])
 
-        bind_cmd,ru1 = self.create_command(PushCmd([id,values]))
-        # ru = "Reuse " if ru1 else ""
-        # print (ru + str(self.cmd_hash[bind_cmd]))
-
+        bind_cmd,_ = self.create_command(PushCmd([id,values]))
         self.add_or_promote_command(bind_cmd)
-        # if ru1:
         self.working_sequence.append(bind_cmd)
-        #if not ru1:
-        #    self.cmd_log.append(self.cmd_hash[bind_cmd])
 
-        node_cmd,ru2 = self.create_command(NodeLabCmd(0, label))
-        # ru = "Reuse " if ru2 else ""
+        node_cmd,_ = self.create_command(NodeLabCmd(0, label))
         self.add_or_promote_command(node_cmd)
-        # if ru2:
         self.working_sequence.append(node_cmd)
-        #if not ru2:#else:
-        #    self.cmd_log.append(self.cmd_hash[node_cmd])
-        # print (ru + str(self.cmd_hash[node_cmd]))
-
-        # # TODO: this should only be unique if the binding is unique
-        # cat_cmd,ru3 = self.create_command(CatCmd((bind_cmd,), (node_cmd,)))
-        # ru = "Reuse " if ru3 else ""
-
-        # # FOR now we are greedy and always do at least the CAT
-        # #if not ru1 or not ru2:# or not ru3:
-        # if not ru3 and not self.add_or_promote_command(cat_cmd):
-        #     self.cmd_stack[cat_cmd] = arg_stack
-        #     print ("Args: %s"%arg_stack)
-        # else:
-        #     self.working_sequence.append(cat_cmd)
-        #     #self.cmd_log.append(self.cmd_hash[cat_cmd])
-
-        # print (ru + str(self.cmd_hash[cat_cmd]))
 
         # self.flush_working_sequence()
 
@@ -340,51 +311,18 @@ class GraphScript:
         Adds an edge between the source and node with a given label.
         Current version does NOT have properties but this could be extended.
         """
-        # return
-        arg_stack: List[Tuple] = []
-        arg_stack.append((dest,))
-        arg_stack.append((source,))
 
-        bind1_cmd,ru1 = self.create_command(PushCmd([dest]))
-        # ru = "Reuse " if ru1 else ""
-        # print (ru + str(self.cmd_hash[bind1_cmd]))
+        bind1_cmd,_ = self.create_command(PushCmd([dest]))
         self.add_or_promote_command(bind1_cmd)
-        # if ru1:
         self.working_sequence.append(bind1_cmd)
         
-        # if not ru1:
-            # self.cmd_log.append(self.cmd_hash[bind1_cmd])
-
-        bind2_cmd,ru2 = self.create_command(PushCmd([source]))
-        # ru = "Reuse " if ru2 else ""
-        # print (ru + str(self.cmd_hash[bind2_cmd]))
+        bind2_cmd,_ = self.create_command(PushCmd([source]))
         self.add_or_promote_command(bind2_cmd)
-        # if ru2:
         self.working_sequence.append(bind2_cmd)
-        # else:
-            # self.cmd_log.append(self.cmd_hash[bind2_cmd])
 
-        edge_cmd,ru3 = self.create_command(EdgeLabCmd(0, label, 1))
-        # ru = "Reuse " if ru3 else ""
-        # print (ru + str(self.cmd_hash[edge_cmd]))
+        edge_cmd,_ = self.create_command(EdgeLabCmd(0, label, 1))
         self.add_or_promote_command(edge_cmd)
-        # if ru3:
         self.working_sequence.append(edge_cmd)
-        # else:
-            # self.cmd_log.append(self.cmd_hash[edge_cmd])
-
-        # cat_cmd,ru4 = self.create_command(Cat3Cmd((bind1_cmd,), (bind2_cmd,), [edge_cmd]))
-        # ru = "Reuse " if ru4 else ""
-
-        # # FOR now we are greedy and always do at least the CAT
-        # #if not ru1 or not ru2 or not ru3:
-        # if not ru4 and not self.add_or_promote_command(cat_cmd):
-        #     self.cmd_stack[cat_cmd] = arg_stack
-        #     print ("Args: %s"%arg_stack)
-        # # else:
-        # self.working_sequence.append(cat_cmd)
-        #     # self.cmd_log.append(self.cmd_hash[cat_cmd])
-        # print (ru + str(self.cmd_hash[cat_cmd]))
 
         # self.flush_working_sequence()
 
