@@ -88,9 +88,9 @@ class EdgeLabCmd(Cmd):
         Cmd.__init__(self, Op.EDGE_LAB, [frominx, label, toinx], GraphScript.get_id_from_key(str((frominx, label,toinx))))
 
 class CatCmd(Cmd):
-    def __init__(self, left_interval, right_interval):
-        # type: (int, List[Any], List[Any]) -> None
-        Cmd.__init__(self, Op.CONCAT, [left_interval, right_interval], GraphScript.get_id())
+    def __init__(self, left_op, right_op):
+        # type: (int, UUID, UUID) -> None
+        Cmd.__init__(self, Op.CONCAT, [left_op, right_op], GraphScript.get_id_from_key(str(left_op) + str(right_op)))
 
 class Cat3Cmd(Cmd):
     def __init__(self, left_interval, mid_interval, right_interval):
@@ -131,6 +131,8 @@ class GraphScript:
     cmd_hash: Mapping[UUID,Cmd] = {}
     cmd_stack: Mapping[UUID,List[Any]] = {}
 
+    cmd_argsize: Mapping[UUID,int] = {}
+
     # The list of commands that we are queuing up
     working_sequence: List[UUID] = []
 
@@ -162,6 +164,7 @@ class GraphScript:
             del self.cmd_list[-1]
             del self.cmd_stack[cmd]
             del self.cmd_hash[cmd]
+            del self.cmd_argsize[cmd]
 
     def add_or_promote_command(self, the_id: UUID) -> bool:
         """
@@ -177,7 +180,7 @@ class GraphScript:
             self.evict()
             return False
 
-    def create_command(self, cmd: Cmd) -> Tuple[UUID, bool]:
+    def create_command(self, cmd: Cmd, argsize: int = 1) -> Tuple[UUID, bool]:
         """
         Given the Cmd and its unique signature -- creates
         a new Cmd with a new UUID, or returns the UUID of a previous
@@ -187,11 +190,12 @@ class GraphScript:
 
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
+            self.cmd_argsize[id] = argsize
             return (id, False)
         else:
             return (id, True)
 
-    def create_command(self, cmd: Cmd) -> Tuple[UUID, bool]:
+    def create_command(self, cmd: Cmd, argsize: int = 1) -> Tuple[UUID, bool]:
         """
         Given the Cmd and its unique signature -- creates
         a new Cmd with a new UUID, or returns the UUID of a previous
@@ -201,6 +205,7 @@ class GraphScript:
 
         if id not in self.cmd_hash:
             self.cmd_hash[id] = cmd
+            self.cmd_argsize[id] = argsize
             return (id, False)
         else:
             return (id, True)
@@ -214,7 +219,7 @@ class GraphScript:
         binding_list: List[Cmd] = []
         updated_command_list: List[Cmd] = []
 
-        print ('Merging %s'%updated_list)
+        # print ('Merging %s'%updated_list)
 
         # Collect each item
         for item in working_list:
@@ -274,6 +279,18 @@ class GraphScript:
 
         return updated_command_list
 
+    def create_composite_from_ids(self, one: UUID, two: UUID) -> Tuple[UUID, int]:
+        argsize = self.cmd_argsize[one] + self.cmd_argsize[two]
+        new_command, _ = self.create_command(CatCmd(one, two), argsize)
+
+        return (new_command, argsize) 
+
+    def create_composite(self, cmd1: Cmd, cmd2: Cmd) -> Tuple[UUID, int]:
+        argsize = self.cmd_argsize[cmd1.get_id()] + self.cmd_argsize[cmd2.get_id()]
+        new_command, _ = self.create_command(CatCmd(cmd1.get_id(), cmd2.get_id()), argsize)
+
+        return (new_command, argsize) 
+
     def flush_working_sequence(self):
         # For now, dequeue all items in the working sequence
         # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
@@ -283,8 +300,14 @@ class GraphScript:
 
         # Trigger a CONCAT each time we have a new PUSH that doesn't 
         # match an existing sequence?
+        last_item = None
+        done = set()
         for item in self.working_sequence:
+            # if last_item and item in done and last_item in done:
+            #     item, siz = self.create_composite_from_ids(last_item, item)
             self.cmd_log.append(self.cmd_hash[item])
+            done.add(item)
+            last_item = item
 
         self.working_sequence.clear()
 
@@ -435,8 +458,8 @@ def simple_test(db, store):
     prog1_source = store.add_node(db, 'mprov', 'entity', ('prog1.c', '1-1-1980'))
 
     write_motif(db, store, prog1_source, input_common, 10)
-    # write_motif(db, store, prog1_source, input_common, 20)
-    # write_motif(db, store, prog1_source, input_common, 30)
+    write_motif(db, store, prog1_source, input_common, 20)
+    write_motif(db, store, prog1_source, input_common, 30)
 
     store.flush(db, "mprov")
 
