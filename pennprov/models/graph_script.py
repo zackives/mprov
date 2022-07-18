@@ -136,6 +136,8 @@ class GraphScript:
     # The list of commands that we are queuing up
     working_sequence: List[UUID] = []
 
+    data_entries: List[UUID] = []
+
     MAX: int = 1024              # max entries in command LRU queue
 
     def __init__(self, store: ProvenanceStore):
@@ -214,70 +216,70 @@ class GraphScript:
         self.cmd_log.apply()
 
 
-    def merge_bindings(self, working_list: List[Cmd]) -> List[Cmd]:
-        updated_list = working_list.copy()
-        binding_list: List[Cmd] = []
-        updated_command_list: List[Cmd] = []
+    # def merge_bindings(self, working_list: List[Cmd]) -> List[Cmd]:
+    #     updated_list = working_list.copy()
+    #     binding_list: List[Cmd] = []
+    #     updated_command_list: List[Cmd] = []
 
-        # print ('Merging %s'%updated_list)
+    #     # print ('Merging %s'%updated_list)
 
-        # Collect each item
-        for item in working_list:
-            if isinstance(self.cmd_hash[item], PushCmd):
-                if item not in binding_list:
-                    binding_list.append(item)
-                    # print (' Added push item to stack %s' %item)
-                    updated_command_list.append(item)
+    #     # Collect each item
+    #     for item in working_list:
+    #         if isinstance(self.cmd_hash[item], PushCmd):
+    #             if item not in binding_list:
+    #                 binding_list.append(item)
+    #                 # print (' Added push item to stack %s' %item)
+    #                 updated_command_list.append(item)
 
-        for first_k in range(1, len(binding_list)+1):
-            # For each prefix of the binding list, collect
-            # all commands that specifically reference the bindings
-            # in that prefix
-            args = binding_list[0:first_k]
-            # print("Studying %s" %args)
-            inx = 0
-            working_stack = []
-            while inx < len(updated_list):
-                command = self.cmd_hash[updated_list[inx]]
+    #     for first_k in range(1, len(binding_list)+1):
+    #         # For each prefix of the binding list, collect
+    #         # all commands that specifically reference the bindings
+    #         # in that prefix
+    #         args = binding_list[0:first_k]
+    #         # print("Studying %s" %args)
+    #         inx = 0
+    #         working_stack = []
+    #         while inx < len(updated_list):
+    #             command = self.cmd_hash[updated_list[inx]]
 
-                if isinstance(command, PushCmd):
-                    # Drop the PUSH commands
-                    #print ('***  PUSH %s %s'%(command,command.args))
+    #             if isinstance(command, PushCmd):
+    #                 # Drop the PUSH commands
+    #                 #print ('***  PUSH %s %s'%(command,command.args))
                     
-                    ### Only continue expanding the stack if we are allowed
-                    ### this many binding parameters!!!
-                    if command.args[0] in working_stack or \
-                    len(set(working_stack)) < len(args):
-                        working_stack.append(command.args[0])
-                    else:
-                        break
-                    inx = inx + 1
-                elif isinstance(command, NodeLabCmd):
-                    # TODO: rewrite with the correct index
-                    # print ('NODE with stack top %s'%working_stack[-1])
-                    if working_stack[-1-command.args[0]] in args:
-                        # print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],args.index(working_stack[-1-command.args[0]])))
-                        new_command,_ = self.create_command(NodeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1]))
-                        print ('*** %s %s'%(self.cmd_hash[new_command], args[self.cmd_hash[new_command].args[0]]))
-                        updated_command_list.append(new_command)
-                        del updated_list[inx]
-                    else:
-                        inx = inx + 1
-                elif isinstance(command, EdgeLabCmd):
-                    # TODO: rewrite
-                    #print('%s'%working_stack)
-                    #print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],working_stack[-1-command.args[2]]))
-                    if working_stack[-1-command.args[0]] in args and working_stack[-1-command.args[2]] in args:
-                        new_command, _ = self.create_command(EdgeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1], args.index(working_stack[-1-command.args[2]])))
-                        print ('**> %s %s %s'%(self.cmd_hash[new_command],args[self.cmd_hash[new_command].args[0]],args[self.cmd_hash[new_command].args[2]]))
-                        updated_command_list.append(new_command)
-                        del updated_list[inx]
-                    else:
-                        inx = inx + 1
-                else:
-                    inx = inx + 1
+    #                 ### Only continue expanding the stack if we are allowed
+    #                 ### this many binding parameters!!!
+    #                 if command.args[0] in working_stack or \
+    #                 len(set(working_stack)) < len(args):
+    #                     working_stack.append(command.args[0])
+    #                 else:
+    #                     break
+    #                 inx = inx + 1
+    #             elif isinstance(command, NodeLabCmd):
+    #                 # TODO: rewrite with the correct index
+    #                 # print ('NODE with stack top %s'%working_stack[-1])
+    #                 if working_stack[-1-command.args[0]] in args:
+    #                     # print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],args.index(working_stack[-1-command.args[0]])))
+    #                     new_command,_ = self.create_command(NodeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1]))
+    #                     print ('*** %s %s'%(self.cmd_hash[new_command], args[self.cmd_hash[new_command].args[0]]))
+    #                     updated_command_list.append(new_command)
+    #                     del updated_list[inx]
+    #                 else:
+    #                     inx = inx + 1
+    #             elif isinstance(command, EdgeLabCmd):
+    #                 # TODO: rewrite
+    #                 #print('%s'%working_stack)
+    #                 #print ('*** %s %s %s'%(command,working_stack[-1-command.args[0]],working_stack[-1-command.args[2]]))
+    #                 if working_stack[-1-command.args[0]] in args and working_stack[-1-command.args[2]] in args:
+    #                     new_command, _ = self.create_command(EdgeLabCmd(args.index(working_stack[-1-command.args[0]]), command.args[1], args.index(working_stack[-1-command.args[2]])))
+    #                     print ('**> %s %s %s'%(self.cmd_hash[new_command],args[self.cmd_hash[new_command].args[0]],args[self.cmd_hash[new_command].args[2]]))
+    #                     updated_command_list.append(new_command)
+    #                     del updated_list[inx]
+    #                 else:
+    #                     inx = inx + 1
+    #             else:
+    #                 inx = inx + 1
 
-        return updated_command_list
+    #     return updated_command_list
 
     def create_composite_from_ids(self, one: UUID, two: UUID) -> Tuple[UUID, int]:
         argsize = self.cmd_argsize[one] + self.cmd_argsize[two]
@@ -296,15 +298,15 @@ class GraphScript:
         # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
         # re-indexing
 
-        self.working_sequence = self.merge_bindings(self.working_sequence)
+        # self.working_sequence = self.merge_bindings(self.working_sequence)
 
         # Trigger a CONCAT each time we have a new PUSH that doesn't 
         # match an existing sequence?
         last_item = None
         done = set()
         for item in self.working_sequence:
-            # if last_item and item in done and last_item in done:
-            #     item, siz = self.create_composite_from_ids(last_item, item)
+            if last_item and item in done and last_item in done:
+                item, siz = self.create_composite_from_ids(last_item, item)
             self.cmd_log.append(self.cmd_hash[item])
             done.add(item)
             last_item = item
@@ -317,11 +319,16 @@ class GraphScript:
         Create a new node with a given id and tuple
         """
 
-        bind_cmd,_ = self.create_command(PushCmd([id,values]))
-        self.add_or_promote_command(bind_cmd)
-        self.working_sequence.append(bind_cmd)
+        if id in self.data_entries:
+            inx = len(self.data_entries) - self.data_entries.index(id) - 1
+        else:
+            bind_cmd,_ = self.create_command(PushCmd([id,values]))
+            self.add_or_promote_command(bind_cmd)
+            self.working_sequence.append(bind_cmd)
+            self.data_entries.append(id)
+            inx = 0
 
-        node_cmd,_ = self.create_command(NodeLabCmd(0, label))
+        node_cmd,_ = self.create_command(NodeLabCmd(inx, label))
         self.add_or_promote_command(node_cmd)
         self.working_sequence.append(node_cmd)
 
@@ -335,15 +342,23 @@ class GraphScript:
         Current version does NOT have properties but this could be extended.
         """
 
-        bind1_cmd,_ = self.create_command(PushCmd([dest]))
-        self.add_or_promote_command(bind1_cmd)
-        self.working_sequence.append(bind1_cmd)
+        if source in self.data_entries:
+            sinx = len(self.data_entries) - self.data_entries.index(source) - 1
+        else:
+            sinx = 0
+            bind1_cmd,_ = self.create_command(PushCmd([dest]))
+            self.add_or_promote_command(bind1_cmd)
+            self.working_sequence.append(bind1_cmd)
         
-        bind2_cmd,_ = self.create_command(PushCmd([source]))
-        self.add_or_promote_command(bind2_cmd)
-        self.working_sequence.append(bind2_cmd)
+        if dest in self.data_entries:
+            dinx = len(self.data_entries) - self.data_entries.index(dest) - 1
+        else:
+            dinx = 0
+            bind2_cmd,_ = self.create_command(PushCmd([source]))
+            self.add_or_promote_command(bind2_cmd)
+            self.working_sequence.append(bind2_cmd)
 
-        edge_cmd,_ = self.create_command(EdgeLabCmd(0, label, 1))
+        edge_cmd,_ = self.create_command(EdgeLabCmd(sinx, label, dinx))
         self.add_or_promote_command(edge_cmd)
         self.working_sequence.append(edge_cmd)
 
