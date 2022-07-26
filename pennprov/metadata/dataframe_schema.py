@@ -81,6 +81,8 @@ class SparkSchema(RelSchema):
 
 class SchemaRegistry:
     DEFAULT_KEY = Key([Key.SPECIAL_INDEX], [int])
+    table_map = {}
+    created_tables = set()
 
     def __init__(self):
         self.catalog: Mapping[str,RelSchema] = {}
@@ -113,13 +115,17 @@ class SchemaRegistry:
         else:
             return SchemaRegistry.DEFAULT_KEY
 
-    def create_tables(self, table_map: Mapping[str, str], sql: str):
+    def create_tables(self, table_map: Mapping[str, str], sql: str) -> List[str]:
+        ret = []
         for table in table_map.keys():
-            sql1 = 'CREATE TABLE ' + table + "_tab LIKE " + table + '_uid STORED AS PARQUET'
-            sql2 = table_map[table]
+            if table not in SchemaRegistry.created_tables:
+                sql1 = 'CREATE TABLE ' + table + "_tab LIKE " + table + '_uid STORED AS PARQUET'
+                sql2 = table_map[table]
 
-            print (sql2)
-            print (sql1)
+                ret.append(sql2)
+                ret.append(sql1)
+                SchemaRegistry.created_tables.add(table)
+        return ret
 
     def get_rewrite(self, sql: str, table_map, select_items, has_groupby) -> str:
         # TODO: go through sql, replace each table in the FROM clause
@@ -221,11 +227,12 @@ class SchemaRegistry:
         # Repeat recursively
         return sql2
 
-    def get_prov_query(self, sql: str) -> str:
+    def get_prov_query_list(self, sql: str) -> List[str]:
         tables = extract_tables(sql)
 
-        table_map = {}
         select_items = []
+
+        ret = []
 
         has_groupby = False
         for statement in sqlparse.parse(sql):
@@ -257,17 +264,18 @@ class SchemaRegistry:
             # as ~index~, if there isn't already a key
             for attr in tab_key.get_attributes():
                 if attr == Key.SPECIAL_INDEX:
-                    if tab_name not in table_map:
-                        table_map[tab_name] = \
+                    if tab_name not in SchemaRegistry.table_map:
+                        SchemaRegistry.table_map[tab_name] = \
                             'CREATE VIEW ' + tab_name + '_uid AS ' + \
                             ' SELECT *, monotonically_increasing_id() AS _prov FROM ' + tab_name
                     select_items.append(tab + '._prov')
                 else:
                     select_items.append(tab + '.' + attr)
 
-        if len(table_map):
-            print ('Substitute tables for Skolem tables:')
-            self.create_tables(table_map, sql)
+        ret = []
+        if len(SchemaRegistry.table_map):
+            # print ('Substitute tables for Skolem tables:')
+            ret = self.create_tables(SchemaRegistry.table_map, sql)
 
         # # For each join, output the cat of those indices as the prov
         # if len(select_items):
@@ -276,7 +284,9 @@ class SchemaRegistry:
         # For each groupby, output the nested list of those indices as the prov
 
         # Repeat recursively
-        return self.get_rewrite(sql, table_map, select_items, has_groupby)
+        ret.append(self.get_rewrite(sql, SchemaRegistry.table_map, select_items, has_groupby))
+
+        return ret
         
 
 sr = SchemaRegistry()
@@ -286,12 +296,12 @@ sr.add_pandas('b', df)
 sr.set_keys('b', ['x'], [str])
 print('Dataframe keys: %s'%sr.get_keys('df'))
 
-print('Prov query: %s'%sr.get_prov_query('select a, d as coffee from a, b where a.x = b.y'))
+print('Prov queries: %s'%sr.get_prov_query_list('select a, d as coffee from a, b where a.x = b.y'))
 
-print('Prov query: %s'%sr.get_prov_query('select a, d as coffee, monotonically_increasing_id() from a AS t, b, c where t.x = b.y and b.z = c.d'))
+print('Prov queries: %s'%sr.get_prov_query_list('select a, d as coffee, monotonically_increasing_id() from a AS t, b, c where t.x = b.y and b.z = c.d'))
 
-print('Prov query: %s'%sr.get_prov_query('select * from a AS t left join b AS G on a.x = b.y, c group by w'))
+print('Prov queries: %s'%sr.get_prov_query_list('select * from a AS t left join b AS G on a.x = b.y, c group by w'))
 
-print('Prov query: %s'%sr.get_prov_query('select * from a where x = 5'))
+print('Prov queries: %s'%sr.get_prov_query_list('select * from a where x = 5'))
 
-print('Prov query: %s'%sr.get_prov_query('select * from a where false'))
+print('Prov queries: %s'%sr.get_prov_query_list('select * from a where false'))
