@@ -1,3 +1,21 @@
+######################
+## mProv Copyright (C) 2017-22 by Trustees of the University of Pennsylvania
+## All Rights Reserved.
+## 
+##
+# ## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+######################
+
 from __future__ import print_function
 
 from typing import List, Any, Dict, Tuple, Mapping, Callable, Set
@@ -14,42 +32,29 @@ class Subgraph:
     """
     A subgraph
     """
-    creation_event = None       # type: UUID
-    event_manager = None        # type: EventManager
-    node_set = frozenset()      # type: frozenset[str]
-
-    node_mapping = []           # type: List[str]
-
-    internal_edges = None       # type: Mapping[UUID,Tuple[str,UUID]]
-    external_edges = None       # type: List[Tuple[UUID,str,UUID]]
-
-    node_to_event_tree = {}     # type: Mapping[UUID,UUID]
-
-    maximal = None              # type: Subgraph
-    parent = None               # type: Subgraph
-
-    written = False
-
     def __init__(self, initial_nodeset, emgr, creation_event, opt_internal_edges=None, opt_external_edges=None):
         # type: (Set[UUID], EventManager, UUID, list[Dict], list[Tuple]) -> None
-        self.node_set = frozenset(initial_nodeset)
-        self.node_mapping = list(initial_nodeset)
-        self.event_manager = emgr
-        self.creation_event = creation_event
+
+        self.written = False
+
+        self.node_set = frozenset(initial_nodeset)      # type: frozenset[str]
+        self.node_mapping = list(initial_nodeset)       # type: List[str]
+        self.event_manager = emgr                       # type: EventManager
+        self.creation_event = creation_event            # type: UUID
         if opt_internal_edges:
-            self.internal_edges = opt_internal_edges
+            self.internal_edges = opt_internal_edges    # type: Mapping[UUID,Tuple[str,UUID]]
         else:
-            self.internal_edges = {}
+            self.internal_edges = {}                    # type: Mapping[UUID,Tuple[str,UUID]]
         if opt_external_edges:
-            self.external_edges = opt_external_edges
+            self.external_edges = opt_external_edges    # type: List[Tuple[UUID,str,UUID]]
         else:
-            self.external_edges = []
-        self.node_to_event_tree = {}
+            self.external_edges = []                    # type: List[Tuple[UUID,str,UUID]]
+        self.node_to_event_tree = {}                    # type: Mapping[UUID,UUID]
         self.written = False
         for node in initial_nodeset:
             self.node_to_event_tree[node] = creation_event
-        self.maximal = self
-        self.parent = None
+        self.maximal = self                           # type: Subgraph
+        self.parent = None                            # type: Subgraph
         logging.debug("Creating new subgraph %s"%self)
 
     def merge(first, second, new_event):

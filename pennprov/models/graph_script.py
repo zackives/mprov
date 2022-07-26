@@ -1,6 +1,6 @@
 from doctest import script_from_examples
 from enum import Enum
-from typing import List, Any, Mapping, Tuple
+from typing import List, Any, Mapping, Tuple, MutableSet
 import uuid
 from uuid import UUID
 
@@ -21,11 +21,7 @@ class Op(Enum):
     REF = 32
 
 class Cmd:
-    op = None            # type: Op
-    args = None          # Type: List[None]
-    id = None
-
-    def __init__(self, op, args, id=None):
+    def __init__(self, op: Op, args: List[Any], id:UUID=None):
         # type: (Op, List[Any], UUID) -> None
         self.op = op
         self.args = args
@@ -57,15 +53,25 @@ class PushCmd(Cmd):
         else:
             return Cmd.__str__(self)
 
+class PopCmd(Cmd):
+    def __init__(self, arg):
+        # type: (UUID|str) -> None
+        if isinstance(arg, list):
+            Cmd.__init__(self, Op.POP, arg, "p" + str(arg[0]))
+        else:
+            Cmd.__init__(self, Op.POP, [arg], "p" + str(arg))
+
+    def __str__(self) -> str:
+        if len(self.args) == 1 and isinstance(self.args[0], Tuple) and \
+            len(self.args[0]) == 1 and isinstance(self.args[0][0], UUID):
+            return str(self.id) + ": " + str(self.op) + " " + self.args[0][0].hex
+        else:
+            return Cmd.__str__(self)
+
 class SetCmd(Cmd):
     def __init__(self, arg, pos):
         # type: (UUID|str, int) -> None
         Cmd.__init__(self, Op.SET, [arg, pos])
-
-class PopCmd(Cmd):
-    def __init__(self):
-        # type: () -> None
-        Cmd.__init__(self, Op.POP, [])
 
 class DelCmd(Cmd):
     def __init__(self, pos):
@@ -106,43 +112,45 @@ class RefCmd(Cmd):
         return str(self.id) + ": " + str(self.op) + " " + str([str(x)+ " " for x in self.args])
 
 class CmdLog:
-    # Actual history log, to push to DB
-    cmd_log: List[UUID] = []
 
     def __init__(self, store: ProvenanceStore):
-        pass
+        # Actual history log, to push to DB
+        self.cmd_log: List[UUID] = []
 
     def append(self, command: Cmd):
         self.cmd_log.append(command)
 
+    def remove(self, index: int):
+        del self.cmd_log[-index - 1]
+
     def apply(self):
-        print("** Commands **")
+        print("** %d commands **" %len(self.cmd_log))
         for item in self.cmd_log:
             print("%s"%item)
 
 
 class GraphScript:
-    # Bounded LRU queue, from ordering -> hash
-    cmd_list: List[UUID] = []
-
-    cmd_log: CmdLog
-
-    # Hash --> command
-    cmd_hash: Mapping[UUID,Cmd] = {}
-    cmd_stack: Mapping[UUID,List[Any]] = {}
-
-    cmd_argsize: Mapping[UUID,int] = {}
-
-    # The list of commands that we are queuing up
-    working_sequence: List[UUID] = []
-
-    data_entries: List[UUID] = []
-
     MAX: int = 1024              # max entries in command LRU queue
 
     def __init__(self, store: ProvenanceStore):
-        self.cmd_log = CmdLog(store)
+        self.cmd_log: CmdLog = CmdLog(store)
+        
+        # Bounded LRU queue, from ordering -> hash
+        self.cmd_list: List[UUID] = []
 
+        # Hash --> command
+        self.cmd_hash: Mapping[UUID,Cmd] = {}
+        self.cmd_stack: Mapping[UUID,List[Any]] = {}
+
+        self.cmd_argsize: Mapping[UUID,int] = {}
+
+        # The list of commands that we are queuing up
+        self.working_sequence: List[UUID] = []
+
+        self.data_entries: List[UUID] = []
+
+
+    @classmethod
     def get_id() -> UUID:
         """
         Returns a new UUID
@@ -281,6 +289,39 @@ class GraphScript:
 
     #     return updated_command_list
 
+    def find_scope(self, cmd_list: List[UUID]) -> Mapping[UUID,Tuple[int,int]]:
+        """
+        For each command in the list, finds the first and last index
+        where
+        """
+        id_mapping: Mapping[UUID, Tuple[int, int]] = {}
+        working_state: List[UUID] = []
+
+        for inx, cmd in enumerate(cmd_list):
+            cmd = self.cmd_hash[cmd]
+            if isinstance(cmd, PushCmd):
+                the_id = cmd.args[0]
+                working_state.append(the_id)
+                if the_id in id_mapping:
+                    id_mapping[the_id] = (id_mapping[the_id][0], inx)
+                else:
+                    id_mapping[the_id] = (inx, inx)
+            elif isinstance(cmd, NodeLabCmd):
+                the_id = working_state[-1-cmd.args[0]]
+            elif isinstance(cmd, EdgeLabCmd):
+                the_id = working_state[-1-cmd.args[0]]
+                if the_id in id_mapping:
+                    id_mapping[the_id] = (id_mapping[the_id][0], inx)
+                else:
+                    id_mapping[the_id] = (inx, inx)
+                the_id = working_state[-1-cmd.args[2]]
+                if the_id in id_mapping:
+                    id_mapping[the_id] = (id_mapping[the_id][0], inx)
+                else:
+                    id_mapping[the_id] = (inx, inx)
+
+        return id_mapping
+
     def create_composite_from_ids(self, one: UUID, two: UUID) -> Tuple[UUID, int]:
         argsize = self.cmd_argsize[one] + self.cmd_argsize[two]
         new_command, _ = self.create_command(CatCmd(one, two), argsize)
@@ -293,21 +334,109 @@ class GraphScript:
 
         return (new_command, argsize) 
 
+    def reverse_indices(self, sequence):
+        reversed = []
+        working_state = []
+
+        for item in sequence:
+            cmd = self.cmd_hash[item]
+            if isinstance(cmd, PushCmd):# and cmd.args[0] not in working_state:
+                working_state.append(cmd.args[0])
+                print("(%s)" %cmd)
+
+            if isinstance(cmd, NodeLabCmd):
+                print("%s -> " %cmd)
+                arg = working_state[-cmd.args[0]-1]
+                cmd.args[0] = len(working_state) - 1 - cmd.args[0]
+                # self.create_command(cmd)
+                print("--> %s " %cmd)
+                if arg != working_state[cmd.args[0]]:
+                    raise "Error"
+            elif isinstance(cmd, EdgeLabCmd):
+                print("%s -> " %cmd)
+                arg = working_state[-cmd.args[0]-1]
+                cmd.args[0] = len(working_state) - 1 - cmd.args[0]
+                if arg != working_state[cmd.args[0]]:
+                    raise "Error"
+                arg = working_state[-cmd.args[2]-1]
+                cmd.args[2] = len(working_state) - 1 - cmd.args[2]
+                if arg != working_state[cmd.args[2]]:
+                    raise "Error"
+                print("--> %s " %cmd)
+                # self.create_command(cmd)
+
+            reversed.append(cmd)
+
+        return reversed, working_state
+
     def flush_working_sequence(self):
         # For now, dequeue all items in the working sequence
         # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
         # re-indexing
 
         # self.working_sequence = self.merge_bindings(self.working_sequence)
+        scope_map = self.find_scope(self.working_sequence)
+        pop_map: Mapping[int, MutableSet[int]] = {}
+        for key in scope_map:
+            if scope_map[key][1] in pop_map:
+                pop_map[scope_map[key][1]].add(key)
+            else:
+                pop_map[scope_map[key][1]] = set([key])
+
+        sequence, allstate = self.reverse_indices(self.working_sequence)
+
+        # print (sequence)
+
+        # TODO: need to reindex positional indices as we pop items!
+
+        # Sketch: convert all positions to ABSOLUTE indices
+        # In last step convert them to RELATIVE indices
+
+        print(allstate)
+
+        new_seq = []
+        working_state = []
+        for inx, cmd in enumerate(sequence):
+            print("> %s"%cmd)
+            new_seq.append(cmd.get_id())
+            #cmd = self.cmd_hash[item]
+            if isinstance(cmd, PushCmd):# and cmd.args[0] not in working_state:
+                working_state.append(cmd.args[0])
+                print(working_state)
+            if inx in pop_map:
+                for it2 in pop_map[inx]:
+                    cmd = self.create_command(PopCmd(it2))[0]
+                    print("Pop %s"%self.cmd_hash[cmd])
+                    new_seq.append(cmd)
+                    del working_state[-1]
+
+                # TODO: for all remaining nodes / edges, realign
+                # stack
+            if isinstance(cmd, NodeLabCmd):
+                arg = allstate[cmd.args[0]]
+                cmd.args[0] = len(working_state) - 1 - working_state.index(arg)
+                c2,_ = self.create_command(cmd)
+                new_seq.append(c2)
+            elif isinstance(cmd, EdgeLabCmd):
+                cmd.args[0] = len(working_state) - 1 - cmd.args[0]
+                cmd.args[2] = len(working_state) - 1 - cmd.args[2]
+                c2,_ = self.create_command(cmd)
+                new_seq.append(c2)
+
+        self.working_sequence.clear()
+        self.working_sequence += new_seq
 
         # Trigger a CONCAT each time we have a new PUSH that doesn't 
         # match an existing sequence?
         last_item = None
+        last_done = False
         done = set()
         for item in self.working_sequence:
-            if last_item and item in done and last_item in done:
-                item, siz = self.create_composite_from_ids(last_item, item)
+            # if last_item and item in done and last_done:
+            #     item, siz = self.create_composite_from_ids(last_item, item)
+            #     self.cmd_log.remove(1)
             self.cmd_log.append(self.cmd_hash[item])
+            last_done = item in done
             done.add(item)
             last_item = item
 
