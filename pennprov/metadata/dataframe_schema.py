@@ -16,12 +16,16 @@
 ## limitations under the License.
 ######################
 
+from ast import While
+from tokenize import Whitespace
 import pandas as pd
 from pyspark.sql.types import StructField, StructType
 from typing import ClassVar, List, Mapping, Any
 from pyspark.sql.functions import monotonically_increasing_id
+from sqlparse.sql import IdentifierList, Identifier, Statement
+from sqlparse.tokens import Keyword, DML, Text, Token, Wildcard
 
-from pennprov.queries.parse_sql import extract_tables
+from pennprov.queries.parse_sql import extract_tables,is_subselect
 
 import sqlparse
 
@@ -109,15 +113,130 @@ class SchemaRegistry:
         else:
             return SchemaRegistry.DEFAULT_KEY
 
+    def create_tables(self, table_map: Mapping[str, str], sql: str):
+        for table in table_map.keys():
+            sql1 = 'CREATE TABLE ' + table + "_tab LIKE " + table + '_uid STORED AS PARQUET'
+            sql2 = table_map[table]
+
+            print (sql2)
+            print (sql1)
+
+    def get_rewrite(self, sql: str, table_map, select_items, has_groupby) -> str:
+        # TODO: go through sql, replace each table in the FROM clause
+        # that matches table, with table_tab
+        sql2 = ""
+
+        # print ("Rewriting %s with %s and %s"%(sql, table_map, select_items))
+
+        for statement in sqlparse.parse(sql):
+            if not isinstance(statement, Statement):
+                raise RuntimeError('Cannot get PROV query from something other than a select statement')
+
+            select_seen = False
+            from_seen = False
+            skip_token = False
+            for item in statement.tokens:
+                if item.ttype is Text.Whitespace:
+                    sql2 = sql2 + str(item)
+                    continue
+                
+                if item.is_group and item[0].ttype is Keyword and item[0].value.upper() == 'WHERE':
+                    # print ('WHERE %s' %item.tokens[1:])
+                    sql2 = sql2 + str(item[0]).upper()
+                    for item2 in item.tokens[1:]:
+                        sql2 = sql2 + str(item2)
+                    from_seen = False
+                    select_seen = False
+                elif item.ttype is not Keyword and item.ttype is not DML:
+                    if from_seen:
+                        if skip_token:
+                            skip_Token = False
+                            sql2 = sql2 + str(item)
+                            continue
+                        if is_subselect(item):
+                            raise RuntimeError('Nested statements not yet supported')
+                        else:
+                            rewrite = ''
+                            if item.is_group:
+                                table = str(item.tokens[0])
+                                if table in table_map:
+                                    table = table + '_tab'
+                                    rewrite = str(table) 
+
+                                    if len(item.tokens) == 1:
+                                        rewrite = rewrite + ' as ' + str(item.tokens[0])
+                                    else:
+                                        for table in item.tokens[1:]:
+                                            rewrite = rewrite + str(table)
+                                else:
+                                    rewrite = str(item)
+                            else:
+                                table = str(item)
+                                if table in table_map:
+                                    rewrite = table + '_tab as ' + table
+                                else:
+                                    rewrite = table
+
+                            sql2 = sql2 + rewrite
+                    elif select_seen:
+                        if is_subselect(item):
+                            raise RuntimeError('Nested statements not yet supported')
+
+                        if len(select_items):
+                            if len(select_items) > 1:
+                                select_str = ', '.join(select_items)
+                                if has_groupby:
+                                    sql2 = sql2 + ', '.join([str(item), 'collect_list(concat(' + select_str + ')) as _prov'])
+                                else:
+                                    sql2 = sql2 + ', '.join([str(item), 'concat(' + select_str + ') as _prov'])
+                            else:
+                                if has_groupby:
+                                    sql2 = sql2 + str(item) + ', collect_list(' + select_items[0] + ') as _prov'
+                                else:
+                                    sql2 = sql2 + str(item) + ', ' + select_items[0] + ' as _prov'
+                    else:
+                        sql2 = sql2 + str(item)
+                else:
+                    if item.ttype is DML and item.value.upper() == 'SELECT':
+                        sql2 = sql2 + str(item).upper()
+                        select_seen = True
+                    elif item.ttype is Keyword and item.value.upper() == 'FROM':
+                        sql2 = sql2 + str(item).upper()
+                        from_seen = True
+                        select_seen = False
+                    elif from_seen and item.ttype is Keyword and item.value.upper() == 'ON':
+                        sql2 = sql2 + str(item).upper()
+                        skip_token = True
+                    elif item.ttype is Keyword and \
+                        item.value.upper() in ['ORDER', 'GROUP', 'BY', 'WHERE', 'HAVING', 'GROUP BY', 'ORDER BY']:
+
+                        sql2 = sql2 + str(item).upper()
+                        from_seen = False
+                        select_seen = False
+                    elif item.ttype is Keyword:
+                        sql2 = sql2 + str(item).upper()
+                    else:
+                        sql2 = sql2 + str(item)
+
+        # Repeat recursively
+        return sql2
+
     def get_prov_query(self, sql: str) -> str:
         tables = extract_tables(sql)
 
         table_map = {}
-        extra_statements = []
-
-        clauses = []
-
         select_items = []
+
+        has_groupby = False
+        for statement in sqlparse.parse(sql):
+            if not isinstance(statement, Statement):
+                raise RuntimeError('Cannot get PROV query from something other than a select statement')
+
+            for item in statement.tokens:
+                if item.ttype is Keyword and item.value.upper() == 'GROUP' or item.value.upper() == 'GROUP BY':
+                    has_groupby = True
+
+
         for tab in tables:
             if '=' in tab:
                 # This is a parser issue, it includes ON clauses
@@ -134,36 +253,30 @@ class SchemaRegistry:
                 tab_name = tab
 
             tab_key = self.get_keys(tab_name)
+            # For each relation, add a monotonically increasing ID
+            # as ~index~, if there isn't already a key
             for attr in tab_key.get_attributes():
                 if attr == Key.SPECIAL_INDEX:
                     if tab_name not in table_map:
                         table_map[tab_name] = \
                             'CREATE VIEW ' + tab_name + '_uid AS ' + \
-                            ' SELECT *, monotonically_increasing_id() AS _sk FROM ' + tab_name
-                        extra_statements.append(table_map[tab_name])
-                    select_items.append(tab + '._sk')
+                            ' SELECT *, monotonically_increasing_id() AS _prov FROM ' + tab_name
+                    select_items.append(tab + '._prov')
                 else:
                     select_items.append(tab + '.' + attr)
 
-        # For each relation, add a monotonically increasing ID
-        # as ~index~
-
-        if len(extra_statements):
-            print ("Extra SQL statements:")
-            for es in extra_statements:
-                print (es)
-
         if len(table_map):
             print ('Substitute tables for Skolem tables:')
-            print (list(table_map.keys()))
+            self.create_tables(table_map, sql)
 
-        # For each join, output the cat of those indices as the prov
-        if len(select_items):
-            print ('Additional SELECT list items:')
-            print (select_items)
+        # # For each join, output the cat of those indices as the prov
+        # if len(select_items):
+        #     print ('Additional SELECT list items:')
+        #     print (select_items)
         # For each groupby, output the nested list of those indices as the prov
 
         # Repeat recursively
+        return self.get_rewrite(sql, table_map, select_items, has_groupby)
         
 
 sr = SchemaRegistry()
@@ -173,4 +286,12 @@ sr.add_pandas('b', df)
 sr.set_keys('b', ['x'], [str])
 print('Dataframe keys: %s'%sr.get_keys('df'))
 
-print('Prov query: %s'%sr.get_prov_query('select * from a AS t join b AS G on a.x = b.y, c'))
+print('Prov query: %s'%sr.get_prov_query('select a, d as coffee from a, b where a.x = b.y'))
+
+print('Prov query: %s'%sr.get_prov_query('select a, d as coffee, monotonically_increasing_id() from a AS t, b, c where t.x = b.y and b.z = c.d'))
+
+print('Prov query: %s'%sr.get_prov_query('select * from a AS t left join b AS G on a.x = b.y, c group by w'))
+
+print('Prov query: %s'%sr.get_prov_query('select * from a where x = 5'))
+
+print('Prov query: %s'%sr.get_prov_query('select * from a where false'))
