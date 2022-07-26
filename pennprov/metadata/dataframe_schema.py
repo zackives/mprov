@@ -160,7 +160,7 @@ class SchemaRegistry:
                             sql2 = sql2 + str(item)
                             continue
                         if is_subselect(item):
-                            raise RuntimeError('Nested statements not yet supported')
+                            raise RuntimeError('Nested SELECTS should not be used. Instead break out the subquery and give it a name')
                         else:
                             rewrite = ''
                             if item.is_group:
@@ -186,7 +186,12 @@ class SchemaRegistry:
                             sql2 = sql2 + rewrite
                     elif select_seen:
                         if is_subselect(item):
-                            raise RuntimeError('Nested statements not yet supported')
+                            raise RuntimeError('Nested SELECT clauses are not supported; instead break into a named separate query')
+
+                        if item.is_group:
+                            for i in item.tokens:
+                                if is_subselect(i):
+                                    raise RuntimeError('Nested SELECT clauses are not supported; instead break into a named separate query')
 
                         if len(select_items):
                             if len(select_items) > 1:
@@ -305,3 +310,14 @@ print('Prov queries: %s'%sr.get_prov_query_list('select * from a AS t left join 
 print('Prov queries: %s'%sr.get_prov_query_list('select * from a where x = 5'))
 
 print('Prov queries: %s'%sr.get_prov_query_list('select * from a where false'))
+
+try:
+    print('Prov queries: %s'%sr.get_prov_query_list('select *, (select * from c) from a where false'))
+except:
+    print('Successfully trapped nested SELECT clause')
+
+try:
+    print('Prov queries: %s'%sr.get_prov_query_list('select * from a AS t join (select * from c) AS G on a.x = b.y, c group by w'))
+    raise RuntimeError('Unexpected: let a nested FROM query expression through')
+except:
+    print('Successfully trapped nested FROM clause')
