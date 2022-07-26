@@ -9,7 +9,7 @@ cachetools >= 4.1
 omegaconf >= 2.1
 psycopg2 >= 2.8.6
 pytest >= 6.2.4
-pyspark >= 3.0.0
+pyspark >= 3.3.0
 suffix-tree >= 0.0.7
-
+sqlparse >= 0.4.2
 

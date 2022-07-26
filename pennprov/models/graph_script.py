@@ -369,6 +369,16 @@ class GraphScript:
 
         return reversed, working_state
 
+    def create_subgraph_sets(self, window_size):
+        """
+        For each start/end index in the node window,
+        find all nodes and edges belong to it.
+
+        We see if we can find the same pattern
+        across different subgraphs -- this is a motif
+        """
+        return
+
     def flush_working_sequence(self):
         # For now, dequeue all items in the working sequence
         # TODO: reorder, merge the PUSHes, add CONCAT and appropriate
