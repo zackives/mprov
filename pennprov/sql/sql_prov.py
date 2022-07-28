@@ -21,6 +21,7 @@ import hashlib, binascii
 import sqlparse
 import pyspark
 
+@DeprecationWarning
 class SqlProvenance:
     tab_to_schema = {}
     mprov = None

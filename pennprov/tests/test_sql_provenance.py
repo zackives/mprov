@@ -1,9 +1,8 @@
 import pandas as pd
-import pyspark
 
-from pennprov.sql.sql_provenance import SparkSqlProvenanceManager
+from pennprov.sql.postgresql_provenance import PostgresqlProvenanceManager
 
-prov_manager = SparkSqlProvenanceManager()
+prov_manager = PostgresqlProvenanceManager()
 sr = prov_manager.get_schema_registry()
 
 df = pd.DataFrame([{'x': 3, 'y': 2}, {'x': 4, 'z': 'str'}])
@@ -19,6 +18,11 @@ sr.set_key('b', ['x'], [str])
 class FakeContext:
     def sql(self, sql):
         print('Spark statement: %s'%sql)
+
+        return df
+
+    def execute(self, sql):
+        print ('Postgresql statement: %s'%sql)
 
         return df
 

@@ -67,7 +67,31 @@ mProv also provides programmatic calls to query the provenance graph, given a no
 * `get_activity_outputs` takes a activity node and traces back on the `wasGeneratedBy` edge to find output activities
 * `get_activity_inputs` takes an activity node and traces the `used` edge to find input nodes
 
-## mProv and Apache Spark
+## mProv and Apache SparkSQL
+
+mProv can take Spark SQL queries and **instrument** them to track provenance.  It does this by:
+
+1. Ensuring each relation has a unique `_prov` identifier --- either by concatenating a database-style *key*, or else by associating each tuple with an auto-generated ID.
+1. For base tuples that don't have a key, it will generate a `_tab` table
+storing the `_prov` column alongside the tuples.
+1. For derived tuples, it will generate a `_prov` column comprised of
+the `_prov` columns of the source tuples.  For a SPJ query that consists
+of an array (one element per source).  For a grouping query that consists
+of an array list (concatenating all _prov arrays).
+
+This setup is intended to work only with single-block SQL queries.  If you have multiple blocks, you will want to have a separate (named) query
+expression for each block.  This allows us to also capture the computational steps (as each query) in a provenance structure.
+
+### Using SqlProvenance
+
+It's simple to use this code.  Wherever you would call `spark.sql(...)` you instead call `SqlProvenance.create_sql_with_provenance(name, sql, spark_session)`.  This code will:
+
+1. Create any necessary intermediate tables to annotate inputs with provenance.
+2. Return a Spark DataFrame that's the result of calling `spark_session.sql` with the rewritten, provenance-annotated SQL query.
+
+In addition, the results of the provenance-annotated query will be saved as a table *name*`_prov`.  This, in turn, will be queriable through the Cypher interface.
+
+## mProv and Apache Spark: Streaming Window Computations
 
 mProv interfaces with Apache Spark, with a focus on instrumenting user-defined functions called through the `pandas_udf`
 decorator.  Here, Spark does a GROUP BY on a set of tuples, then calls the UDF with a subset of tuples, collected in a

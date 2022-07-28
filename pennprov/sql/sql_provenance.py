@@ -16,62 +16,17 @@
 ## limitations under the License.
 ######################
 
-from ast import While
-from tokenize import Whitespace
-import pandas as pd
-from pyspark.sql.types import StructField, StructType
-from typing import ClassVar, List, Mapping, Any, Tuple
-from pyspark.sql.functions import monotonically_increasing_id
-from sqlparse.sql import IdentifierList, Identifier, Statement
+from typing import List, Mapping, Any, Tuple
+from sqlparse.sql import Statement
 from sqlparse.tokens import Keyword, DML, Text, Token, Wildcard
 
-from pyspark.sql import SparkSession, DataFrame
-
 from pennprov.queries.parse_sql import extract_tables,is_subselect
-from pennprov.metadata.dataframe_schema import SparkSchema, PandasSchema, RelSchema, Key
+from pennprov.sql.schema_registry import SchemaRegistry
+from pennprov.metadata.dataframe_schema import Key
 
 import sqlparse
 import logging
 
-class SchemaRegistry:
-    DEFAULT_KEY = Key([Key.SPECIAL_INDEX], [int])
-    table_map = {}
-    created_tables = set()
-
-    def __init__(self):
-        self.catalog: Mapping[str,RelSchema] = {}
-        self.keys: Mapping[str,Key] = {}
-
-
-    def add_schema(self, relation: str, schema: RelSchema):
-        logging.debug('Adding relation key %s'%relation)
-        self.catalog[relation] = schema
-
-    def remove_schema(self, relation):
-        del self.catalog[relation]
-
-    def get_schema(self, relation:str) -> RelSchema:
-        return self.catalog[relation]
-
-    def add_pandas_dataframe(self, name: str, df: pd.DataFrame):
-        logging.debug('Adding Pandas dataframe %s'%name)
-        self.catalog[name] = PandasSchema(df)
-        self.keys[name] = [Key.SPECIAL_INDEX]
-
-    def add_spark_dataframe(self, name: str, sch: StructType):
-        logging.debug('Adding Spark dataframe %s'%name)
-        self.catalog[name] = SparkSchema(sch)
-        self.keys[name] = [Key.SPECIAL_INDEX]
-
-    def set_key(self, name: str, keys: List[str], types: List[str]):
-        self.keys[name] = Key(keys, types)
-        logging.debug('Set key %s: %s'%(name,self.keys[name]))
-
-    def get_key(self, name: str) -> Key:
-        if name in self.keys:
-            return self.keys[name]
-        else:
-            return SchemaRegistry.DEFAULT_KEY
 
 class ProvenanceManager:
     registry = SchemaRegistry()
@@ -166,7 +121,7 @@ class SqlProvenanceManager(ProvenanceManager):
                                         rewrite = rewrite + ' as ' + str(item.tokens[0])
                                     else:
                                         for table in item.tokens[1:]:
-                                            rewrite = rewrite + str(table)
+                                            rewrite = rewrite + self.prune(str(table))
                                 else:
                                     rewrite = str(item)
                             else:
@@ -189,14 +144,14 @@ class SqlProvenanceManager(ProvenanceManager):
                         if len(select_items):
                             if len(select_items) > 1:
                                 if has_groupby:
-                                    sql2 = sql2 + ', '.join([str(item), self._list_agg(self._const_agg(select_items)) + ' as _prov'])
+                                    sql2 = sql2 + ', '.join([self.prune(str(item)), self._list_agg(self._const_agg(select_items)) + ' as _prov'])
                                 else:
-                                    sql2 = sql2 + ', '.join([str(item), self._const_agg(select_items) + ' as _prov'])
+                                    sql2 = sql2 + ', '.join([self.prune(str(item)), self._const_agg(select_items) + ' as _prov'])
                             else:
                                 if has_groupby:
                                     sql2 = sql2 + str(item) + ', ' + self._list_agg(select_items) + ' as _prov'
                                 else:
-                                    sql2 = sql2 + str(item) + ', ' + select_items[0] + ' as _prov'
+                                    sql2 = sql2 + str(item) + ', ' + self.prune(select_items[0]) + ' as _prov'
                     else:
                         sql2 = sql2 + str(item)
                 else:
@@ -222,6 +177,12 @@ class SqlProvenanceManager(ProvenanceManager):
                         sql2 = sql2 + str(item)
 
         return sql2
+
+    def prune(self, str):
+        if ' as ' in str.lower():
+            return str[0:str.lower().index(' as ')]
+        else:
+            return str
 
     def generate_prov_query_and_tables(self, sql: str) -> Tuple[Mapping[str, str], List[str]]:
         """
@@ -266,15 +227,18 @@ class SqlProvenanceManager(ProvenanceManager):
             tab_key = self.registry.get_key(tab_name)
             # For each relation, add a monotonically increasing ID
             # as ~index~, if there isn't already a key
-            for attr in tab_key.get_attributes():
-                if attr == Key.SPECIAL_INDEX:
-                    if tab_name not in SchemaRegistry.table_map:
-                        SchemaRegistry.table_map[tab_name] = \
-                            'CREATE VIEW ' + tab_name + '_uid AS ' + \
-                            ' SELECT *, monotonically_increasing_id() AS _prov FROM ' + tab_name
-                    select_items.append(tab + '._prov')
-                else:
-                    select_items.append(tab + '.' + attr)
+            if len(tab_key.get_attributes()) == 1:
+                for attr in tab_key.get_attributes():
+                    if attr == Key.SPECIAL_INDEX:
+                        if tab_name not in SchemaRegistry.table_map:
+                            SchemaRegistry.table_map[tab_name] = \
+                                'CREATE VIEW ' + tab_name + '_uid AS ' + \
+                                ' SELECT *, array(monotonically_increasing_id()) AS _prov FROM ' + tab_name
+                        select_items.append(tab + '._prov')
+                    else:
+                        select_items.append(tab + '.' + self.prune(attr) + " AS _prov")
+            else:
+                select_items.append('concat(' + ','.join(tab + '.' + self.prune(attr)) for attr in tab_key.get_attributes() + ' as _prov')
 
         ret = {}
         if len(SchemaRegistry.table_map):
@@ -285,36 +249,3 @@ class SqlProvenanceManager(ProvenanceManager):
 
 
 
-class SparkSqlProvenanceManager(SqlProvenanceManager):
-    def __init__(self):
-        SqlProvenanceManager.__init__(self)
-
-    def _table_storage(self):
-        return super()._table_storage() + 'STORED AS PARQUET'
-
-    def _list_agg(self, items: str) -> str:
-        return 'collect_list(' + items + ')'
-
-    def _const_agg(self, items: str):
-        select_str = ', '.join(items)
-        return 'array(' + select_str + ')'
-
-    def create_sql_with_provenance(self, name:str, sql: str, context: SparkSession) -> DataFrame:
-        rewritten_sql, aux_tables = self.generate_prov_query_and_tables(sql)
-
-        # Generate views first
-        for view in aux_tables.keys():
-            if view.endswith('_uid'):
-                context.sql(aux_tables[view])
-
-        # Generate provenance stored tables next
-        for view in aux_tables.keys():
-            if view.endswith('_tab'):
-                context.sql(aux_tables[view])
-        
-        context.sql('CREATE VIEW ' + name + '_prov AS ' + rewritten_sql)
-
-        context.sql('CREATE TABLE ' + name + ' LIKE ' + name + '_prov STORED PARQUET')
-
-        # Return an intermediate result
-        return context.sql('select * from ' + name)
