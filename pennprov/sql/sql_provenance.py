@@ -21,7 +21,7 @@ from sqlparse.sql import Statement
 from sqlparse.tokens import Keyword, DML, Text, Token, Wildcard
 
 from pennprov.queries.parse_sql import extract_tables,is_subselect
-from pennprov.sql.schema_registry import SchemaRegistry
+from pennprov.metadata.schema_registry import SchemaRegistry
 from pennprov.metadata.dataframe_schema import Key
 
 import sqlparse

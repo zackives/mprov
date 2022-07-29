@@ -1,7 +1,7 @@
 import pennprov.metadata.dataframe_schema
 import pennprov.metadata.graph_template
 import pennprov.models.graph_script
-from pennprov.sql.schema_registry import SchemaRegistry
+from pennprov.metadata.schema_registry import SchemaRegistry
 
 class Catalog:
     input_and_prov_tables: SchemaRegistry = SchemaRegistry()
