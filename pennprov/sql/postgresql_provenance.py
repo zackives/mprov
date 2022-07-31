@@ -1,4 +1,3 @@
-import imp
 from pennprov.sql.sql_provenance import SqlProvenanceManager
 import psycopg2
 
