@@ -124,7 +124,7 @@ def x_test_main():
     ####  [i3] /
     ####
 
-def x_test_at_scale():
+def test_at_scale():
     mprov_conn.create_or_reset_graph()
     main_stream = mprov_conn.create_collection('output_ecg')
     sub_stream_1 = mprov_conn.create_collection('output_ecg_1', 1)
@@ -225,11 +225,11 @@ def x_test_graph():
     mprov_conn.get_dot("test_graph.dot")
     print('Finished after %s' %(datetime.now()-start))
 
-# @MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
-# def tst(n):
-#     return n.groupby('x').count()
+@MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
+def tst(n):
+    return n.groupby('x').count()
 
-# @MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
-# def tstx(n):
-#     return n.groupby('x').count()
+@MProvAgg("ecg", 'output_ecg',['x'],['x'], sub_stream_2)
+def tstx(n):
+    return n.groupby('x').count()
 
