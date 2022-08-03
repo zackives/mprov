@@ -30,7 +30,11 @@ from pennprov.metadata.stream_metadata import BasicTuple
 import psycopg2
 from pennprov.config import config
 
+import pandas as pd
+import numpy as np
+
 from pennprov.connection.dblayer import ProvenanceStore, Factory
+from pennprov.metadata.stream_metadata import BasicSchema, BasicTuple
 
 class MProvConnection:
     namespace = 'http://mprov.md2k.org'
@@ -40,6 +44,9 @@ class MProvConnection:
     #log = LogIndex()
     log = Factory.get_index() # type: ProvenanceStore
     #log = CompressingLogIndex()
+
+    # Global map of relation names to keys
+    relation_keys = {}
 
     """
     MProvConnection is a high-level API to the PennProvenance framework, with
@@ -80,6 +87,10 @@ class MProvConnection:
         self.qualified_names = config.qualified_names
 
         self.graph_name = config.provenance.graph
+
+        self.seq = 0
+        self.keys_to_tokens = {}
+
         return
 
     def create_or_reset_graph(self):
@@ -796,6 +807,109 @@ class MProvConnection:
                 fh.write(dot + "}")
 
         return dot + "}"
+
+    def convert_df_schema(self, name:str, df:pd.DataFrame) -> BasicSchema:
+        """
+        Given a Pandas dataframe, create a corresponding MProv schema
+        """
+        schema_elements = {}
+        for column in df:
+            col = df[column]
+
+            if col.dtype == np.float64 or col.dtype == np.int64:
+                schema_elements[df[column].name] = 'double'
+            elif col.dtype == int:
+                schema_elements[df[column].name] = 'int'
+            elif col.dtype == str or col.dtype == object:
+                schema_elements[df[column].name] = 'string'
+            else:
+                raise RuntimeError(str(col.dtype))
+        return BasicSchema(name, schema_elements)
+
+    def convert_series_schema(self, name:str, sr:pd.Series) -> BasicSchema:
+        """
+        Given a Pandas series, create a corresponding MProv schema
+        """
+        schema_elements = {}
+        for inx,col in sr.items():
+            if isinstance(col, np.float64) or isinstance(col, np.int64):
+                schema_elements[inx] = 'double'
+            elif isinstance(col, int):
+                schema_elements[inx] = 'int'
+            elif isinstance(col, str) or isinstance(col, object):
+                schema_elements[inx] = 'string'
+            else:
+                raise RuntimeError(str(col))
+        return BasicSchema(name, schema_elements)
+
+    def store_df_row(self, schema:BasicSchema, df_row:pd.Series, key:str):
+        """
+        Store a row from a dataframe, and return its node ID
+        """
+        values = {}
+        for k in schema.fields:
+            values[k] = df_row.loc[k]
+
+        tup = BasicTuple(schema, values)
+
+        # Store the initial data, get the ID (token) of its node in the graph
+        return self.store_stream_tuple('SampleStream', tup[key], tup)
+
+
+    def store_df_rows_with_provenance(self, name:str, df: pd.DataFrame, key:str):
+        """
+        Convert from a Pandas dataframe to PROV entries and store each
+        """
+        tuple_unique_ids = {}
+
+        schema = self.convert_df_schema(name, df)
+        MProvConnection.relation_keys[name] = key
+
+        for inx, item in df.iterrows():
+            tuple_unique_ids[item.loc[key]] = self.store_df_row(schema, item, key)
+            self.keys_to_tokens[name + '.' + item.loc[key]] = tuple_unique_ids[item.loc[key]]
+            logging.debug('%s: %s'%(item.loc[key],self.token_to_str(keys_to_tokens[name + '.' + item.loc[key]])))
+
+        self.flush()
+        return tuple_unique_ids
+
+    def _token_to_str(self, token):
+        return '{' + token.namespace + '/' + token.local_part
+
+    def store_series_with_provenance(self, name:str, item: pd.Series, key:str):
+        """
+        Convert from a Pandas dataframe to PROV entries and store each
+        """
+        tuple_unique_ids = {}
+
+        schema = self.convert_series_schema(name, item)
+        MProvConnection.relation_keys[name] = key
+
+        tuple_unique_ids[item.loc[key]] = self.store_df_row(schema, item, key)
+        self.keys_to_tokens[name + '.' + item.loc[key]] = tuple_unique_ids[item.loc[key]]
+        logging.debug('%s: %s'%(item.loc[key],self.token_to_str(keys_to_tokens[name + '.' + item.loc[key]])))
+
+        self.flush()
+        return tuple_unique_ids[item.loc[key]]
+
+    def record_provenance(self, input_name, input_row, processing_step, output_name, output_row):
+        input_node = self.keys_to_tokens[input_name + '.' + input_row[MProvConnection.relation_keys[input_name]]]
+
+        out_tuple = self.store_series_with_provenance(output_name, output_row, MProvConnection.relation_keys[output_name])
+
+        ts = str(datetime.now())
+        ts = ts[0:ts.index('.')].replace(' ','T')+'Z'
+        invocation = self.store_activity(processing_step, ts, ts, str(self.seq))
+        self.seq = self.seq + 1
+
+        self.store_derived_from(out_tuple, input_node)
+        self.store_generated_by(out_tuple, invocation)
+        self.store_used(invocation, input_node)  
+
+        return invocation
+
+    def set_relation_key(self, relation, keys):
+        MProvConnection.relation_keys[relation] = keys
 
     def flush(self):
         with self.graph_conn as conn:
