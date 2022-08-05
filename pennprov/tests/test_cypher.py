@@ -26,7 +26,7 @@ ci = CypherInterface()
 gtg = GraphTemplateGenerator(SimpleGraph.node_gen, SimpleGraph.edge_gen, SimpleGraph.node_gen('agent',{}))
 
 def test_parser():
-    ci.parse('MATCH (n) RETURN count(n)')
+    print('%s'%ci.parse('MATCH (n) -> (m) RETURN count(n)')[1])
 
 
 def test_match():
@@ -36,4 +36,5 @@ def test_match():
 
     template = gtg.generate_prov_derivation(input, process, datetime.datetime.now(), output)
 
-    print (gtg)
+    print (SimpleGraph.nodes)
+    print (SimpleGraph.edges)    

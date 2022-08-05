@@ -165,16 +165,8 @@ class GraphScript:
         # The list of commands that we are queuing up
         self.working_sequence: List[UUID] = []
 
-<<<<<<< Updated upstream
         self.data_entries: List[UUID] = []
-=======
-    working_operands: List[UUID] = []
 
-    MAX: int = 1024              # max entries in command LRU queue
->>>>>>> Stashed changes
-
-
-    @classmethod
     def get_id() -> UUID:
         """
         Returns a new UUID
@@ -409,59 +401,6 @@ class GraphScript:
         # re-indexing
 
         # self.working_sequence = self.merge_bindings(self.working_sequence)
-<<<<<<< Updated upstream
-        scope_map = self.find_scope(self.working_sequence)
-        pop_map: Mapping[int, MutableSet[int]] = {}
-        for key in scope_map:
-            if scope_map[key][1] in pop_map:
-                pop_map[scope_map[key][1]].add(key)
-            else:
-                pop_map[scope_map[key][1]] = set([key])
-
-        sequence, allstate = self.reverse_indices(self.working_sequence)
-
-        # print (sequence)
-
-        # TODO: need to reindex positional indices as we pop items!
-
-        # Sketch: convert all positions to ABSOLUTE indices
-        # In last step convert them to RELATIVE indices
-
-        print(allstate)
-
-        new_seq = []
-        working_state = []
-        for inx, cmd in enumerate(sequence):
-            print("> %s"%cmd)
-            new_seq.append(cmd.get_id())
-            #cmd = self.cmd_hash[item]
-            if isinstance(cmd, PushCmd):# and cmd.args[0] not in working_state:
-                working_state.append(cmd.args[0])
-                print(working_state)
-            if inx in pop_map:
-                for it2 in pop_map[inx]:
-                    cmd = self.create_command(PopCmd(it2))[0]
-                    print("Pop %s"%self.cmd_hash[cmd])
-                    new_seq.append(cmd)
-                    del working_state[-1]
-
-                # TODO: for all remaining nodes / edges, realign
-                # stack
-            if isinstance(cmd, NodeLabCmd):
-                arg = allstate[cmd.args[0]]
-                cmd.args[0] = len(working_state) - 1 - working_state.index(arg)
-                c2,_ = self.create_command(cmd)
-                new_seq.append(c2)
-            elif isinstance(cmd, EdgeLabCmd):
-                cmd.args[0] = len(working_state) - 1 - cmd.args[0]
-                cmd.args[2] = len(working_state) - 1 - cmd.args[2]
-                c2,_ = self.create_command(cmd)
-                new_seq.append(c2)
-
-        self.working_sequence.clear()
-        self.working_sequence += new_seq
-=======
->>>>>>> Stashed changes
 
         # Trigger a CONCAT each time we have a new PUSH that doesn't 
         # match an existing sequence?
@@ -484,8 +423,6 @@ class GraphScript:
         """
         Create a new node with a given id and tuple
         """
-<<<<<<< Updated upstream
-=======
         # return
         arg_stack: List[Tuple] = []
         arg_stack.append([id, values])
@@ -516,7 +453,6 @@ class GraphScript:
         # # TODO: this should only be unique if the binding is unique
         # cat_cmd,ru3 = self.create_command(CatCmd((bind_cmd,), (node_cmd,)))
         # ru = "Reuse " if ru3 else ""
->>>>>>> Stashed changes
 
         if id in self.data_entries:
             inx = len(self.data_entries) - self.data_entries.index(id) - 1
@@ -540,26 +476,6 @@ class GraphScript:
         Adds an edge between the source and node with a given label.
         Current version does NOT have properties but this could be extended.
         """
-<<<<<<< Updated upstream
-
-        if source in self.data_entries:
-            sinx = len(self.data_entries) - self.data_entries.index(source) - 1
-        else:
-            sinx = 0
-            bind1_cmd,_ = self.create_command(PushCmd([dest]))
-            self.add_or_promote_command(bind1_cmd)
-            self.working_sequence.append(bind1_cmd)
-        
-        if dest in self.data_entries:
-            dinx = len(self.data_entries) - self.data_entries.index(dest) - 1
-        else:
-            dinx = 0
-            bind2_cmd,_ = self.create_command(PushCmd([source]))
-            self.add_or_promote_command(bind2_cmd)
-            self.working_sequence.append(bind2_cmd)
-
-        edge_cmd,_ = self.create_command(EdgeLabCmd(sinx, label, dinx))
-=======
         # return
         arg_stack: List[Tuple] = []
         arg_stack.append((dest,))
@@ -586,7 +502,6 @@ class GraphScript:
         edge_cmd,ru3 = self.create_command(EdgeLabCmd(source_inx, label, dest_inx))
         # ru = "Reuse " if ru3 else ""
         # print (ru + str(self.cmd_hash[edge_cmd]))
->>>>>>> Stashed changes
         self.add_or_promote_command(edge_cmd)
         self.working_sequence.append(edge_cmd)
 
@@ -678,35 +593,3 @@ class ProvenanceScript(ProvenanceStore):
 
 
 
-<<<<<<< Updated upstream
-=======
-######################## Simple Test Script #######################
-
-
-def write_motif(db, store, prog1_source, input_common, offset):
-    input1 = store.add_node(db, "mprov", "entity", ('stream1', 1+offset,3+offset,'x'))
-    input2 = store.add_node(db, "mprov", "entity", ('stream2', 2+offset,4+offset,'y'))
-    prog1_exec1 = store.add_node(db, "mprov", 'activity', ('prog1_'+str(offset),'7-1-2022'))
-    output1 = store.add_node(db, "mprov", "entity", ('stream3', 3+offset,5+offset,'z'))
-    edge1 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input1)
-    edge2 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input2)
-    edge3 = store.add_edge(db, 'mprov', prog1_exec1, 'used', input_common)
-    edge4 = store.add_edge(db, 'mprov', output1, 'wasGeneratedBy', prog1_exec1)
-    edge5 = store.add_edge(db, 'mprov', prog1_exec1, 'used', prog1_source)
-    edge6 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input1)
-    edge7 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input2)
-    edge8 = store.add_edge(db, 'mprov', output1, 'wasDerivedFrom', input_common)
-
-def simple_test(db, store):
-    # These nodes are used across multiple motifs
-    input_common = store.add_node(db, "mprov", "entity", ('file1',))
-    prog1_source = store.add_node(db, 'mprov', 'entity', ('prog1.c', '1-1-1980'))
-
-    write_motif(db, store, prog1_source, input_common, 10)
-    write_motif(db, store, prog1_source, input_common, 20)
-    write_motif(db, store, prog1_source, input_common, 30)
-
-    store.flush(db, "mprov")
-
-simple_test(None, ProvenanceScript(ProvenanceStore()))
->>>>>>> Stashed changes
