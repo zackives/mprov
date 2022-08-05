@@ -36,5 +36,15 @@ def test_match():
 
     template = gtg.generate_prov_derivation(input, process, datetime.datetime.now(), output)
 
-    print (SimpleGraph.nodes)
-    print (SimpleGraph.edges)    
+    print('\nNodes:')
+    for item in SimpleGraph.nodes.items():
+        print (item)
+
+    print('\nEdges:')
+    for item in SimpleGraph.edges:
+        print (item)
+    
+    query = "MATCH (a) -> wasDerivedFrom -> (b) RETURN a, b"
+    template2 = ci.parse(query)[1]
+
+    print (template2)

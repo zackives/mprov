@@ -17,6 +17,9 @@ class GraphComponent:
     def is_variable(self):
         return False
 
+    def __repr__(self):
+        return str(self.label)
+
 class EdgeGraphTemplate(GraphComponent):    
     def __init__(self, src, label, dst):
         super().__init__(label)
@@ -31,7 +34,7 @@ class EdgeGraphTemplate(GraphComponent):
 
 class NodeGraphTemplate(GraphComponent):
     def __init__(self, value):
-        self.value = value
+        super().__init__(value)
 
     def is_leaf(self):
         return True
