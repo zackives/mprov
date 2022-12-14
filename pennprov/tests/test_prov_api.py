@@ -225,6 +225,7 @@ def x_test_graph():
     mprov_conn.get_dot("test_graph.dot")
     print('Finished after %s' %(datetime.now()-start))
 
+
 @MProvAgg("ecg", 'output_ecg',['x','y'],['x','y'], sub_stream_1)
 def tst(n):
     return n.groupby('x').count()

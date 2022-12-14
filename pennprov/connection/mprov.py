@@ -918,6 +918,9 @@ class MProvConnection:
             conn.commit()
         return
 
+    def persist_pennsieve(pennsieve, ds_id, file_id, url):
+        pennsieve.
+
     def close(self):
         self.flush()
         return

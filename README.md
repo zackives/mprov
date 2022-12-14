@@ -1,4 +1,4 @@
-# pennprov
+# pennprov: Penn Provenance for Python
 
 This Python package connects to the [PennProvenance](https://pennprovenance.net) provenance services, which are part of the broader Habitat Data Environment.  Additional high-level services oriented towards the mProv stream data provenance project are also included.
 
@@ -93,6 +93,10 @@ conn.store_derived_result('OutStream', out_tuple['key'], out_tuple, input_token,
 ```
 
 We have also included `Jupyter-PennProv.ipynb`, which is a Jupyter Notebook suitable for running in a Dockerized Jupyter (e.g., `all-spark-notebook`) that will connect to PennProvenance.
+
+## Credits
+
+Parts of this work were funded by NSF 1910108, "Promoting Reuse and Retargeting in Data Science" and NSF ACI-1640813, "mProv: Provenance-Based Data Analytics Cyberinfrastructure for High-frequency Mobile Sensor Data."
 
 ## Documentation for API Endpoints
 

@@ -11,4 +11,9 @@ provenance:
  password: YOUR_PASSWORD
  index: new # -> NewProvenanceStore. See pennprov/connection/dblayer.py for alternatives.
 
+pennsieve:
+ # Login to app.pennsieve,io and create an API key
+ api_key: ...
+ api secret: ...
+
 qualified_names: False
