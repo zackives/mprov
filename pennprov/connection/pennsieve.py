@@ -18,14 +18,14 @@ class PennsieveClient:
         r.raise_for_status()
 
         cognito_app_client_id = r.json()["tokenPool"]["appClientId"]
-        cognito_region = r.json()["tokenPool"]["region"]
+        cognito_region = r.json()["region"]
 
         print("Connecting to " + cognito_region + ", app " + cognito_app_client_id)
 
         cognito_idp_client = boto3.client(
             "cognito-idp",
             region_name=cognito_region,
-            aws_access_key_id=""
+            aws_access_key_id="",
             aws_secret_access_key="",
         )
 
