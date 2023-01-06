@@ -8,7 +8,7 @@ import datetime
 from pennprov.config import config
 
 
-PENNSIEVE_URL = "https://api.pennsieve.net"
+PENNSIEVE_URL = "https://api.pennsieve.io"
 
 
 class PennsieveClient:
