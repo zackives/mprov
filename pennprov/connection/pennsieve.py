@@ -4,8 +4,12 @@ import requests
 import logging
 import uuid
 import datetime
-
+from requests.exceptions import HTTPError
 from pennprov.config import config
+
+logger = logging.getLogger(__name__)
+
+PENNSIEVE_URL = "https://api.pennsieve.io"
 
 
 class PennsieveClient:
@@ -14,8 +18,7 @@ class PennsieveClient:
     '''
 
     def __init__(self):
-        self.api_url = config.pennsieve.api_url
-        r = requests.get(f"{self.api_url}/authentication/cognito-config")
+        r = requests.get(f"{PENNSIEVE_URL}/authentication/cognito-config")
         r.raise_for_status()
 
         self.cognito_app_client_id = r.json()["tokenPool"]["appClientId"]
@@ -30,7 +33,7 @@ class PennsieveClient:
 
     def _ensure_active_api_session(self):
         if self.api_session is None or self.api_session.is_almost_expired():
-            print("Connecting to " + self.cognito_region + ", app " + self.cognito_app_client_id)
+            logger.debug(f"Connecting to {self.cognito_region}, app {self.cognito_app_client_id}")
 
             # Authenticate to AWS Cognito
             #
@@ -89,8 +92,8 @@ class PennsieveClient:
 
         # Create provenance model
         try:
-            model_response = self._post(f"{self.api_url}/models/v1/datasets/{ds_id}/concepts", payload=model_payload)
-
+            model_response = self._post(f"{PENNSIEVE_URL}/models/v1/datasets/{ds_id}/concepts", payload=model_payload)
+            model_response.raise_for_status()
             payload = [
                 {
                     "id": ds_id,
@@ -106,14 +109,16 @@ class PennsieveClient:
             ]
 
             property_response = self._put(
-                f"{self.api_url}/models/v1/datasets/{ds_id}/concepts/{model_name}/properties",
+                f"{PENNSIEVE_URL}/models/v1/datasets/{ds_id}/concepts/{model_name}/properties",
                 payload=payload)
+            property_response.raise_for_status()
 
-            return model_name
-
-        except:
-            pass
-        return None
+        except HTTPError as e:
+            if model_response.status_code == requests.codes.bad_request:
+                logger.debug(f"Ignoring bad create model request. Model probably already exists: {e}")
+            else:
+                raise e
+        return model_name
 
     def _attach_file_to_record(self, ds_id, file_id, record_id):
         payload = {
@@ -132,7 +137,7 @@ class PennsieveClient:
             ]
         }
         response = self._post(
-            f'{self.api_url}/models/datasets/{ds_id}/proxy/package/instances', payload=payload)
+            f'{PENNSIEVE_URL}/models/datasets/{ds_id}/proxy/package/instances', payload=payload)
         return response
 
     def attach_provenance(self, ds_id, file_id, prov_url):
@@ -146,7 +151,7 @@ class PennsieveClient:
             }
         ]}
 
-        response = self._post(f"{self.api_url}/models/v1/datasets/{ds_id}/concepts/{model_name}/instances", payload)
+        response = self._post(f"{PENNSIEVE_URL}/models/v1/datasets/{ds_id}/concepts/{model_name}/instances", payload)
         record_id = response.json()['id']
         self._attach_file_to_record(ds_id, file_id, record_id)
         return

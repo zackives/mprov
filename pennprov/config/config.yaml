@@ -15,6 +15,5 @@ pennsieve:
  # Login to app.pennsieve,io and create an API key
  api_key: ${oc.env:PENNSIEVE_API_KEY}
  api_secret: ${oc.env:PENNSIEVE_API_SECRET}
- api_url: ${oc.env:PENNSIEVE_API_URL,https://api.pennsieve.io}
 
 qualified_names: False
