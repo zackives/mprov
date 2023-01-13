@@ -8,16 +8,14 @@ import datetime
 from pennprov.config import config
 
 
-PENNSIEVE_URL = "https://api.pennsieve.io"
-
-
 class PennsieveClient:
     '''
     Client for app.pennsieve.io platform
     '''
 
     def __init__(self):
-        r = requests.get(f"{PENNSIEVE_URL}/authentication/cognito-config")
+        self.api_url = config.pennsieve.api_url
+        r = requests.get(f"{self.api_url}/authentication/cognito-config")
         r.raise_for_status()
 
         self.cognito_app_client_id = r.json()["tokenPool"]["appClientId"]
@@ -59,32 +57,39 @@ class PennsieveClient:
                 organization_node_id=organization_node_id
             )
 
-    def _post(self, url, payload):
-        '''
-        Post message to Pennsieve, with token attached
-        '''
+    def _base_headers(self):
         self._ensure_active_api_session()
-        headers = {
+        return {
             "accept": "application/json",
             "content-type": "application/json",
             "authorization": "Bearer " + self.api_session.token,
             "X-ORGANIZATION-ID": self.api_session.organization_node_id
         }
 
+    def _post(self, url, payload):
+        '''
+        Post message to Pennsieve, with token attached
+        '''
+        headers = self._base_headers()
         return requests.post(url, json=payload, headers=headers)
 
+    def _put(self, url, payload):
+        headers = self._base_headers()
+        return requests.put(url, json=payload, headers=headers)
+
     def _create_model_if_needed(self, ds_id):
-        payload = {
-            "name": "provenance",
-            "displayName": "provenance",
+        model_name = "provenance"
+        model_payload = {
+            "name": model_name,
+            "displayName": model_name,
             "description": "mProv provenance link",
             "locked": True,
-            "templateId": uuid.uuid4()
+            "templateId": str(uuid.uuid4())
         }
 
         # Create provenance model
         try:
-            response = self._post(f"{PENNSIEVE_URL}/models/v1/datasets/datasetId/concepts", payload=payload)
+            model_response = self._post(f"{self.api_url}/models/v1/datasets/{ds_id}/concepts", payload=model_payload)
 
             payload = [
                 {
@@ -94,38 +99,56 @@ class PennsieveClient:
                     "description": "Provenance URL",
                     "locked": True,
                     "default": True,
-                    "conceptTitle": False,
-                    "dataType": "string",
+                    "conceptTitle": True,
+                    "dataType": "String",
                     "required": True
                 }
             ]
 
-            response = self._post(f"{PENNSIEVE_URL}/models/v1/datasets/datasetId/concepts/url/properties", payload=payload)
+            property_response = self._put(
+                f"{self.api_url}/models/v1/datasets/{ds_id}/concepts/{model_name}/properties",
+                payload=payload)
 
-            return response['id']
+            return model_name
 
         except:
             pass
         return None
 
+    def _attach_file_to_record(self, ds_id, file_id, record_id):
+        payload = {
+            "externalId": file_id,
+            "targets": [
+                {
+                    "direction": "FromTarget",
+                    "linkTarget": {
+                        "ConceptInstance": {
+                            "id": record_id
+                        }
+                    },
+                    "relationshipType": "belongs_to",
+                    "relationshipData": []
+                }
+            ]
+        }
+        response = self._post(
+            f'{self.api_url}/models/datasets/{ds_id}/proxy/package/instances', payload=payload)
+        return response
+
     def attach_provenance(self, ds_id, file_id, prov_url):
 
         # Make sure there is a Model for the provenance property
-        self._create_model_if_needed(ds_id)
-
+        model_name = self._create_model_if_needed(ds_id)
         payload = {"values": [
-                {
-                    "name": "prov_url",
-                    "value": prov_url
-                },
-                {
-                    "name": "file",
-                    "value": file_id
-                },
-            ]}
+            {
+                "name": "prov_url",
+                "value": prov_url
+            }
+        ]}
 
-        response = self._post(f"{PENNSIEVE_URL}/models/v1/datasets/" + ds_id + "/concepts/provenance/instances", payload)
-
+        response = self._post(f"{self.api_url}/models/v1/datasets/{ds_id}/concepts/{model_name}/instances", payload)
+        record_id = response.json()['id']
+        self._attach_file_to_record(ds_id, file_id, record_id)
         return
 
 
@@ -149,7 +172,7 @@ class APISession:
         returns True if token is "near" its expiration time, False if not
 
     """
-    EXPIRATION_MARGIN = datetime.timedelta(minutes=5)
+    EXPIRATION_MARGIN = datetime.timedelta(minutes=1)
 
     def __init__(
             self,
