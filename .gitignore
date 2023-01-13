@@ -68,3 +68,6 @@ target/
 
 #Test .dot files
 *.dot
+
+# IntelliJ
+.idea/

@@ -13,7 +13,7 @@ provenance:
 
 pennsieve:
  # Login to app.pennsieve,io and create an API key
- api_key: ...
- api secret: ...
+ api_key: ${oc.env:PENNSIEVE_API_KEY}
+ api_secret: ${oc.env:PENNSIEVE_API_SECRET}
 
 qualified_names: False

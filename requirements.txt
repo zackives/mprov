@@ -14,4 +14,6 @@ suffix-tree >= 0.0.7
 sqlparse >= 0.4.2
 boto3 >= 1.26.29
 requests >= 2.22.0
+pyjwt ~= 2.6
+
 
